@@ -1716,7 +1716,7 @@ function renderContratos(){
       <div style="display:flex;gap:6px;flex-shrink:0;">
         ${autorizado?`
         <button class="btn btn-ghost btn-sm" onclick="editarContrato(${c.id})" title="Editar contrato">✏️ Editar</button>
-        <button class="btn btn-${c.empresa==='happy'?'primary':'purple'} btn-sm" onclick="generarPDF(contratos.find(x=>x.id===${c.id}))">⬇ PDF</button>
+        <button class="btn btn-${c.empresa==='happy'?'primary':'purple'} btn-sm" onclick="descargarContratoPDF(${c.id})">⬇ PDF</button>
         <button class="btn btn-danger btn-sm" onclick="borrarContrato(${c.id})">🗑 Borrar</button>
         `:`<span style="font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;" title="Solo el asesor que registró este contrato puede editarlo, descargarlo o borrarlo">🔒 Solo el asesor titular</span>`}
       </div>
@@ -2285,6 +2285,14 @@ function generarPDF(c){
 }
 
 window.generarPDF=generarPDF;
+// Wrapper expuesto en window: el botón de "PDF" en Contratos dispara este onclick
+// desde HTML insertado por innerHTML, que corre en el scope global del navegador,
+// no dentro de este módulo — por eso no puede referenciar state.contratos
+// directamente y necesita esta función intermedia que sí vive en el módulo.
+window.descargarContratoPDF=function(id){
+  const c=state.contratos.find(x=>x.id===id);
+  if(c)generarPDF(c);
+};
 
 window.showView=function(v){
   document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
