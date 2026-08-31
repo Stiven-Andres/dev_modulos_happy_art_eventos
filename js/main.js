@@ -2228,9 +2228,12 @@ function generarPDF(c){
   overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:28px 36px;text-align:center;font-family:Nunito,sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.2);"><div style="font-size:32px;margin-bottom:10px;">📄</div><div style="font-weight:800;font-size:15px;margin-bottom:6px;">Generando PDF...</div><div style="color:#888;font-size:13px;">Por favor espera un momento</div></div>';
   document.body.appendChild(overlay);
 
-  // Crear DIV temporal oculto (visible:hidden para que html2pdf lo renderice bien)
+  // Crear DIV temporal fuera de pantalla (NO usar visibility:hidden: es un bug
+  // conocido de html2canvas — captura el canvas en blanco cuando el elemento o
+  // un ancestro tiene visibility:hidden. Con left:-9999px ya queda oculto al
+  // usuario sin afectar la captura).
   const contenedor=document.createElement('div');
-  contenedor.style.cssText='position:absolute;left:-9999px;top:0;width:816px;visibility:hidden;z-index:9998;pointer-events:none;';
+  contenedor.style.cssText='position:absolute;left:-9999px;top:0;width:816px;z-index:9998;pointer-events:none;';
   contenedor.innerHTML=html;
   document.body.appendChild(contenedor);
 
