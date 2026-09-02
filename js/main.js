@@ -97,9 +97,15 @@ window.soloNumeros=function(el){
   if(limpio!==el.value){el.value=limpio;try{el.setSelectionRange(pos-1,pos-1);}catch(e){}}
 };
 
+// Evita valores negativos en campos numéricos (stock, precios, cantidades, ajustes).
+window.noNegativo=function(el){
+  if(el.value!==''&&Number(el.value)<0)el.value='0';
+};
 window.soloDigitosTelefono=function(el){
   const pos=el.selectionStart;
-  const limpio=el.value.replace(/[^0-9]/g,'').slice(0,10);
+  let limpio=el.value.replace(/[^0-9]/g,'').slice(0,10);
+  // Celular colombiano: debe iniciar en 3 — se descarta cualquier dígito inicial distinto.
+  while(limpio&&limpio[0]!=='3')limpio=limpio.slice(1);
   if(limpio!==el.value){el.value=limpio;try{el.setSelectionRange(pos,pos);}catch(e){}}
 };
 
@@ -2119,7 +2125,7 @@ function generarPDF(c){
     .medios b{color:${colorEmpresa};}
 
     /* ── SALTO DE PÁGINA ── */
-    .page-break{break-after:page;page-break-after:auto;padding-top:14px;}
+    .page-break{break-after:page;page-break-after:always;padding-top:14px;}
 
     /* ── EVITAR CORTES EN TABLAS E IMÁGENES ── */
     table{width:100%;border-collapse:collapse;page-break-inside:avoid;}
@@ -2232,10 +2238,18 @@ function generarPDF(c){
   // conocido de html2canvas — captura el canvas en blanco cuando el elemento o
   // un ancestro tiene visibility:hidden. Con left:-9999px ya queda oculto al
   // usuario sin afectar la captura).
+  // IMPORTANTE: el elemento que se le pasa a html2pdf/html2canvas (contenedor)
+  // NO puede tener position:absolute/fixed con altura automática — html2canvas
+  // lo mide como altura 0 dentro de su clon interno y el PDF sale en blanco.
+  // Por eso el position:absolute va en un wrapper EXTERNO (que solo oculta de
+  // pantalla) y contenedor, el que realmente se captura, queda en flujo normal
+  // (position:static) dentro de ese wrapper.
+  const wrapperOffscreen=document.createElement('div');
+  wrapperOffscreen.style.cssText='position:absolute;left:-9999px;top:0;width:816px;z-index:9998;pointer-events:none;';
   const contenedor=document.createElement('div');
-  contenedor.style.cssText='position:absolute;left:-9999px;top:0;width:816px;z-index:9998;pointer-events:none;';
   contenedor.innerHTML=html;
-  document.body.appendChild(contenedor);
+  wrapperOffscreen.appendChild(contenedor);
+  document.body.appendChild(wrapperOffscreen);
 
   (async()=>{
     try{
@@ -2275,12 +2289,12 @@ function generarPDF(c){
       };
 
       await html2pdf().set(opt).from(el).save();
-      document.body.removeChild(contenedor);
+      document.body.removeChild(wrapperOffscreen);
       document.body.removeChild(overlay);
       toast('✅ PDF descargado correctamente','ok');
     }catch(err){
       console.error('Error PDF:',err);
-      if(document.body.contains(contenedor))document.body.removeChild(contenedor);
+      if(document.body.contains(wrapperOffscreen))document.body.removeChild(wrapperOffscreen);
       document.body.removeChild(overlay);
       toast('❌ Error al generar PDF','err');
     }

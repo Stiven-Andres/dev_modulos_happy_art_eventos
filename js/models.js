@@ -43,7 +43,8 @@ export function getProd(id){return state.productos.find(p=>p.id===id);}
 
 export function telefonoValido(valor){
   if(!valor)return true;
-  return /^[0-9]{10}$/.test(valor);
+  // Celular colombiano: 10 dígitos, debe iniciar en 3.
+  return /^3[0-9]{9}$/.test(valor);
 };
 
 export function stockStatus(p){if(p.stock===0)return'out';if(p.stock<=p.min)return'low';return'ok';}

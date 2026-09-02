@@ -729,12 +729,12 @@ td.col-actions{text-align:right;}
         <select id="f_evento"><option value="Ambos">✨ Ambos</option><option value="Social">🎊 Social</option><option value="Empresarial">💼 Empresarial</option></select>
       </div>
       <div class="section-divider">Stock y costos</div>
-      <div class="field"><label>Stock inicial</label><input type="number" id="f_stock" placeholder="0" min="0"></div>
-      <div class="field"><label>Stock mínimo</label><input type="number" id="f_min" placeholder="5" min="0"></div>
+      <div class="field"><label>Stock inicial</label><input type="number" id="f_stock" placeholder="0" min="0" oninput="noNegativo(this)"></div>
+      <div class="field"><label>Stock mínimo</label><input type="number" id="f_min" placeholder="5" min="0" oninput="noNegativo(this)"></div>
       <div class="field"><label>Unidad de medida</label>
         <select id="f_unidad"><option>Unidad</option><option>Par</option><option>Set</option><option>Caja</option><option>Docena</option><option>Metro</option><option>Rollo</option><option>Bolsa</option><option>Kg</option><option>Litro</option></select>
       </div>
-      <div class="field"><label>Costo unitario ($)</label><input type="number" id="f_precio" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="field"><label>Costo unitario ($)</label><input type="number" id="f_precio" placeholder="0.00" min="0" step="0.01" oninput="noNegativo(this)"></div>
       <div class="section-divider">Detalles adicionales</div>
       <div class="field"><label>Proveedor</label><input type="text" id="f_proveedor" placeholder="Nombre del proveedor"></div>
       <div class="field"><label>Ubicación en bodega</label><input type="text" id="f_ubicacion" placeholder="Ej: Estante A-3"></div>
@@ -753,7 +753,7 @@ td.col-actions{text-align:right;}
       <div class="field"><label>Tipo de movimiento</label>
         <select id="m_tipo"><option value="entrada">📥 Entrada — compra / recepción</option><option value="salida">📤 Salida — uso / despacho</option><option value="ajuste">🔧 Ajuste de inventario</option></select>
       </div>
-      <div class="field"><label>Cantidad</label><input type="number" id="m_qty" placeholder="0" min="1"></div>
+      <div class="field"><label>Cantidad</label><input type="number" id="m_qty" placeholder="0" min="1" oninput="noNegativo(this)"></div>
       <div class="field"><label>Evento / Cliente</label><input type="text" id="m_evento" placeholder="Ej: Boda García..."></div>
       <div class="field full"><label>Nota u observación</label><input type="text" id="m_nota" placeholder="Proveedor, número de orden, motivo..."></div>
     </div>
@@ -767,7 +767,7 @@ td.col-actions{text-align:right;}
     <div class="modal-header"><span class="modal-title">🔄 Registrar Préstamo</span><button class="close-btn" onclick="closePrestamoModal()">✕</button></div>
     <div class="form-grid">
       <div class="field full"><label>Artículo a prestar</label><select id="p_prod"><option value="">— Seleccionar artículo —</option></select></div>
-      <div class="field"><label>Cantidad</label><input type="number" id="p_qty" placeholder="0" min="1"></div>
+      <div class="field"><label>Cantidad</label><input type="number" id="p_qty" placeholder="0" min="1" oninput="noNegativo(this)"></div>
       <div class="field"><label>Cliente / Evento</label><input type="text" id="p_cliente" placeholder="Nombre del cliente o evento"></div>
       <div class="field"><label>Fecha retorno esperada</label><input type="date" id="p_retorno"></div>
       <div class="field full"><label>Observaciones</label><input type="text" id="p_nota" placeholder="Contacto, condiciones, responsable..."></div>
@@ -822,11 +822,11 @@ td.col-actions{text-align:right;}
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Estos valores se suman a lo calculado automáticamente desde los contratos registrados en el sistema para este mes. Útil para incluir ventas o eventos de meses que no quedaron registrados como contrato.</div>
     <div class="form-grid">
       <div class="section-divider">🎪 Happy Art Eventos</div>
-      <div class="field"><label>Eventos adicionales</label><input type="number" min="0" id="ac_happy_n" inputmode="numeric"></div>
-      <div class="field"><label>Ventas adicionales ($)</label><input type="number" min="0" id="ac_happy_v" inputmode="numeric"></div>
+      <div class="field"><label>Eventos adicionales</label><input type="number" min="0" id="ac_happy_n" inputmode="numeric" oninput="noNegativo(this)"></div>
+      <div class="field"><label>Ventas adicionales ($)</label><input type="number" min="0" id="ac_happy_v" inputmode="numeric" oninput="noNegativo(this)"></div>
       <div class="section-divider">🎭 Conde Eventos</div>
-      <div class="field"><label>Eventos adicionales</label><input type="number" min="0" id="ac_conde_n" inputmode="numeric"></div>
-      <div class="field"><label>Ventas adicionales ($)</label><input type="number" min="0" id="ac_conde_v" inputmode="numeric"></div>
+      <div class="field"><label>Eventos adicionales</label><input type="number" min="0" id="ac_conde_n" inputmode="numeric" oninput="noNegativo(this)"></div>
+      <div class="field"><label>Ventas adicionales ($)</label><input type="number" min="0" id="ac_conde_v" inputmode="numeric" oninput="noNegativo(this)"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-danger btn-sm" onclick="borrarAjusteContabilidad()">🗑 Quitar ajuste</button>
