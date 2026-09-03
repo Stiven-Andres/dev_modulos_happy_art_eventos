@@ -2125,7 +2125,7 @@ function generarPDF(c){
     .medios b{color:${colorEmpresa};}
 
     /* ── SALTO DE PÁGINA ── */
-    .page-break{break-after:page;page-break-after:always;padding-top:14px;}
+    .page-break{padding-top:14px;}
 
     /* ── EVITAR CORTES EN TABLAS E IMÁGENES ── */
     table{width:100%;border-collapse:collapse;page-break-inside:avoid;}
@@ -2140,6 +2140,7 @@ function generarPDF(c){
                        border-bottom:1px solid #eee;font-size:9.8pt;}
     .paquete-items li:last-child{border-bottom:none;}
     .paquete-items li:nth-child(even){background:#f9f9f9;}
+    .paquete-items li{page-break-inside:avoid;break-inside:avoid;}
     .chk{color:#22a55a;font-size:13pt;line-height:1.1;flex-shrink:0;font-weight:900;}
 
     /* ── ENCUESTA ── */
@@ -2188,7 +2189,7 @@ function generarPDF(c){
   <div class="medios"><b>Medios de pago:</b> ${esHappy?mediosPagoHappy:mediosPagoConde}</div>
 
   <!-- PÁGINA 2: CONTENIDO DEL PAQUETE -->
-  <div class="page-break">
+  <div class="page-break" id="pdf-page-2">
     ${headerHTML}
     <div class="titulo">Contenido del Paquete: ${c.paquete}</div>
     <p class="pk-intro">Para mayor seguridad de su paquete contratado y que todo salga bien, le informamos el contenido del paquete seleccionado:</p>
@@ -2196,7 +2197,7 @@ function generarPDF(c){
   </div>
 
   <!-- PÁGINA 3: ENCUESTA -->
-  <div class="page-break">
+  <div class="page-break" id="pdf-page-3">
     ${headerHTML}
     <div class="titulo">Encuesta de Satisfacción</div>
     <p class="enc-intro">Al finalizar el evento, te invitamos a calificar tu experiencia de <strong>1 a 5</strong>, siendo 1 la puntuación más baja y 5 la más alta. ¡Tu opinión es muy importante para nosotros!</p>
@@ -2285,7 +2286,13 @@ function generarPDF(c){
           windowHeight:el.scrollHeight
         },
         jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},
-        pagebreak:{mode:['css','legacy','avoid-all']}
+        // 'avoid-all' trata contenedores completos (como la lista de ítems del
+        // paquete) como un bloque indivisible y los manda enteros a la página
+        // siguiente si no caben — con paquetes grandes eso deja páginas casi
+        // vacías. before:[...] fuerza el salto exacto antes de cada sección
+        // (Contenido del Paquete / Encuesta); page-break-inside:avoid en los
+        // <li> ya evita que se corte un ítem individual a la mitad.
+        pagebreak:{mode:['css'],before:['#pdf-page-2','#pdf-page-3']}
       };
 
       await html2pdf().set(opt).from(el).save();
