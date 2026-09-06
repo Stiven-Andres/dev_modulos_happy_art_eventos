@@ -2231,26 +2231,36 @@ function generarPDF(c){
   toast('⏳ Generando PDF...','ok');
 
   const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  // Fondo 100% opaco (no rgba): el contenedor real del PDF se renderiza a la
+  // vista (ver más abajo) para que html2canvas lo capture de forma confiable,
+  // así que este overlay tiene que taparlo por completo — con transparencia
+  // se alcanzaba a ver un parpadeo del contenido sin estilos por debajo.
+  overlay.style.cssText='position:fixed;inset:0;background:#000000;z-index:9999;display:flex;align-items:center;justify-content:center;';
   overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:28px 36px;text-align:center;font-family:Nunito,sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.2);"><div style="font-size:32px;margin-bottom:10px;">📄</div><div style="font-weight:800;font-size:15px;margin-bottom:6px;">Generando PDF...</div><div style="color:#888;font-size:13px;">Por favor espera un momento</div></div>';
   document.body.appendChild(overlay);
 
-  // Crear DIV temporal fuera de pantalla (NO usar visibility:hidden: es un bug
-  // conocido de html2canvas — captura el canvas en blanco cuando el elemento o
-  // un ancestro tiene visibility:hidden. Con left:-9999px ya queda oculto al
-  // usuario sin afectar la captura).
+  // Crear DIV temporal EN PANTALLA (0,0), tapado por el overlay opaco de
+  // arriba — no usar left:-9999px ni visibility:hidden:
+  // 1) visibility:hidden es un bug conocido de html2canvas: captura el
+  //    canvas en blanco cuando el elemento o un ancestro lo tiene.
+  // 2) left:-9999px (posición fuera del viewport) resultó poco confiable en
+  //    producción: según el tamaño/zoom real del navegador del usuario,
+  //    html2canvas terminaba capturando solo una franja del contenido
+  //    (contrato "cortado a la mitad"), aunque en las pruebas locales con
+  //    varios tamaños de viewport no se logró reproducir siempre. Renderizar
+  //    en (0,0) real, sin trasladar coordenadas, es el patrón más robusto.
   // IMPORTANTE: el elemento que se le pasa a html2pdf/html2canvas (contenedor)
   // NO puede tener position:absolute/fixed con altura automática — html2canvas
   // lo mide como altura 0 dentro de su clon interno y el PDF sale en blanco.
-  // Por eso el position:absolute va en un wrapper EXTERNO (que solo oculta de
-  // pantalla) y contenedor, el que realmente se captura, queda en flujo normal
-  // (position:static) dentro de ese wrapper.
-  const wrapperOffscreen=document.createElement('div');
-  wrapperOffscreen.style.cssText='position:absolute;left:-9999px;top:0;width:816px;z-index:9998;pointer-events:none;';
+  // Por eso el position:fixed va en un wrapper EXTERNO (que solo tapa/ubica en
+  // pantalla) y contenedor, el que realmente se captura, queda en flujo
+  // normal (position:static) dentro de ese wrapper.
+  const wrapperVisual=document.createElement('div');
+  wrapperVisual.style.cssText='position:fixed;left:0;top:0;width:816px;z-index:9998;pointer-events:none;';
   const contenedor=document.createElement('div');
   contenedor.innerHTML=html;
-  wrapperOffscreen.appendChild(contenedor);
-  document.body.appendChild(wrapperOffscreen);
+  wrapperVisual.appendChild(contenedor);
+  document.body.appendChild(wrapperVisual);
 
   (async()=>{
     try{
@@ -2275,15 +2285,15 @@ function generarPDF(c){
         margin:[MARGEN_MM,MARGEN_MM,MARGEN_MM,MARGEN_MM],
         filename:nombreArchivo,
         image:{type:'jpeg',quality:0.97},
+        // Sin scrollX/scrollY/windowWidth/windowHeight: con el contenedor
+        // en (0,0) real (ver más arriba) html2canvas ya calcula solo el
+        // recorte correcto a partir de la posición real en pantalla —
+        // forzar esos valores fue lo que causaba el corte horizontal.
         html2canvas:{
           scale:2,
           useCORS:true,
           letterRendering:true,
-          logging:false,
-          scrollX:0,
-          scrollY:0,
-          windowWidth:816,
-          windowHeight:el.scrollHeight
+          logging:false
         },
         jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},
         // 'avoid-all' trata contenedores completos (como la lista de ítems del
@@ -2296,12 +2306,12 @@ function generarPDF(c){
       };
 
       await html2pdf().set(opt).from(el).save();
-      document.body.removeChild(wrapperOffscreen);
+      document.body.removeChild(wrapperVisual);
       document.body.removeChild(overlay);
       toast('✅ PDF descargado correctamente','ok');
     }catch(err){
       console.error('Error PDF:',err);
-      if(document.body.contains(wrapperOffscreen))document.body.removeChild(wrapperOffscreen);
+      if(document.body.contains(wrapperVisual))document.body.removeChild(wrapperVisual);
       document.body.removeChild(overlay);
       toast('❌ Error al generar PDF','err');
     }
