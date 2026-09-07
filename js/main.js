@@ -1971,14 +1971,13 @@ function renderContratos(){
         <div class="contrato-meta" style="margin-top:2px;">📍 ${c.barrio}, ${c.localidad} · Festejado: ${c.festejado||'—'}</div>
       </div>
       ${state.esAdmin?renderResumenPersonalContrato(c):''}
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        ${state.esAdmin?`
-        <button class="btn btn-purple btn-sm" onclick="abrirProgramarPersonal(${c.id})">📋 Programar personal</button>
-        `:autorizado?`
+      <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+        ${autorizado?`
         <button class="btn btn-ghost btn-sm" onclick="editarContrato(${c.id})" title="Editar contrato">✏️ Editar</button>
         <button class="btn btn-${c.empresa==='happy'?'primary':'purple'} btn-sm" onclick="descargarContratoPDF(${c.id})">⬇ PDF</button>
         <button class="btn btn-danger btn-sm" onclick="borrarContrato(${c.id})">🗑 Borrar</button>
         `:`<span style="font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;" title="Solo el asesor que registró este contrato puede editarlo, descargarlo o borrarlo">🔒 Solo el asesor titular</span>`}
+        ${state.esAdmin?`<button class="btn btn-purple btn-sm" onclick="abrirProgramarPersonal(${c.id})">📋 Programar personal</button>`:''}
       </div>
     </div>`;}).join('');
 }
