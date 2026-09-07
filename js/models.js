@@ -14,6 +14,10 @@ export const state = {
   contratos: [],
   nextContratoId: 1,
   contabAjustes: {},
+  personal: [],
+  nextPersonalId: 1,
+  encuestas: [],
+  nextEncuestaId: 1,
 };
 
 export const ROLES={
@@ -38,6 +42,64 @@ export function obtenerRol(email){
   if(ROLES.BODEGA_EMAILS.includes(e))return'bodega';
   return null;
 }
+
+// ── PERSONAL (staff operativo: logísticos, recreadores, coordinadores, operarios) ──
+export const ROLES_PERSONAL=[
+  {id:'logistico',label:'Logístico',icon:'🚚'},
+  {id:'recreador',label:'Recreador',icon:'🎭'},
+  {id:'coordinador',label:'Coordinador',icon:'🧭'},
+  {id:'operario',label:'Operario',icon:'🔧'}
+];
+
+export const CUENTAS_PAGO=['Nequi','Llave','Daviplata','Bancolombia','Efectivo'];
+
+export function labelRolPersonal(rolId){return ROLES_PERSONAL.find(r=>r.id===rolId)?.label||rolId;}
+
+export function getPersona(id){return state.personal.find(p=>p.id===id);}
+
+// Disponibilidad por fecha: por defecto TODO el personal está disponible;
+// solo se guarda una marca cuando el admin lo pone explícitamente como NO
+// disponible para una fecha puntual (persona.noDisponibleFechas: ['YYYY-MM-DD',...]).
+export function estaDisponible(persona,fecha){
+  if(!persona||!fecha)return true;
+  return !(persona.noDisponibleFechas||[]).includes(fecha);
+}
+
+// ¿Ya está asignada esta persona a OTRO contrato en la misma fecha? (evita doble
+// reserva del mismo empleado el mismo día entre distintos eventos).
+export function personaAsignadaEnFecha(personaId,fecha,excluirContratoId){
+  for(const c of state.contratos){
+    if(c.fecha!==fecha)continue;
+    if(excluirContratoId&&c.id===excluirContratoId)continue;
+    const asign=c.personalAsignado;
+    if(!asign)continue;
+    for(const rol of ROLES_PERSONAL){
+      if((asign[rol.id]||[]).includes(personaId))return true;
+    }
+  }
+  return false;
+}
+
+// ── ENCUESTAS DE SATISFACCIÓN (cargadas desde plantilla Excel de Microsoft Forms) ──
+// Mapeo tolerante de encabezados: cada campo se busca en la fila de encabezados
+// de la plantilla por palabra clave (normalizada, sin tildes), no por nombre
+// exacto de columna — así no se rompe si Forms cambia ligeramente el texto de
+// la pregunta o el admin sube una plantilla con encabezados parecidos.
+export const ENCUESTA_CAMPOS=[
+  {key:'nombreCliente',match:['nombre']},
+  {key:'telefono',match:['telefono','celular']},
+  {key:'fecha',match:['fecha']},
+  {key:'recomendacion',match:['recomiende','recomendaria','probable']},
+  {key:'satisfaccion',match:['satisfech']},
+  {key:'coordinador',match:['desempen']},
+  {key:'puntualidad',match:['puntual']},
+  {key:'sugerencia',match:['diferente','proxima ocasion']},
+  {key:'mejora',match:['mejorar','mejora']}
+];
+
+export function _normEncuestaHeader(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
+
+export const DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 export function getProd(id){return state.productos.find(p=>p.id===id);}
 

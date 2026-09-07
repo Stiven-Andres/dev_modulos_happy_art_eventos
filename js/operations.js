@@ -28,14 +28,18 @@ export async function cargarDatosIniciales(){
     state.prestamos=d.prestamos?Object.values(d.prestamos):[];
     state.contratos=d.contratos?Object.values(d.contratos):[];
     state.contabAjustes=d.contabAjustes||{};
+    state.personal=d.personal?Object.values(d.personal):[];
+    state.encuestas=d.encuestas?Object.values(d.encuestas):[];
     state.nextId=d.nextId||state.nextId;state.nextMovId=d.nextMovId||state.nextMovId;state.nextPrestId=d.nextPrestId||state.nextPrestId;
     state.nextContratoId=d.nextContratoId||state.nextContratoId;
+    state.nextPersonalId=d.nextPersonalId||state.nextPersonalId;
+    state.nextEncuestaId=d.nextEncuestaId||state.nextEncuestaId;
   }
 }
 
 export async function guardarDatos(){
   try{
-    await set(ref(db,DB_PATH),{productos: state.productos,movimientos: state.movimientos,prestamos: state.prestamos,contratos: state.contratos,nextId: state.nextId,nextMovId: state.nextMovId,nextPrestId: state.nextPrestId,nextContratoId: state.nextContratoId,contabAjustes: state.contabAjustes});
+    await set(ref(db,DB_PATH),{productos: state.productos,movimientos: state.movimientos,prestamos: state.prestamos,contratos: state.contratos,nextId: state.nextId,nextMovId: state.nextMovId,nextPrestId: state.nextPrestId,nextContratoId: state.nextContratoId,contabAjustes: state.contabAjustes,personal: state.personal,nextPersonalId: state.nextPersonalId,encuestas: state.encuestas,nextEncuestaId: state.nextEncuestaId});
     document.getElementById('save-indicator').textContent='☁️ Sincronizado con Firebase';
   }catch(e){console.error(e);window.toast('Error al guardar','err');}
 }

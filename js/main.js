@@ -7,7 +7,9 @@ import{
   state,ROLES,obtenerRol,getProd,telefonoValido,stockStatus,statusBadge,catClass,eventoBadge,
   fmt,fmtDate,fmtFecha,MESES_CORTOS,RECUPERABLES_KEYWORDS,_normRecuperable,isConsumable,
   BUSQUEDA_INVENTARIO_ALIAS,buscarTerminosInventario,ESPECIFICACION_ITEMS_PAQUETE,_buscarEspecificacion,
-  PAQUETES,fmtPrecio,fmtFechaContrato,fmtHora,fmtHoraEvento
+  PAQUETES,fmtPrecio,fmtFechaContrato,fmtHora,fmtHoraEvento,
+  ROLES_PERSONAL,CUENTAS_PAGO,labelRolPersonal,getPersona,estaDisponible,personaAsignadaEnFecha,
+  ENCUESTA_CAMPOS,_normEncuestaHeader,DIAS_SEMANA
 }from"./models.js";
 import{
   app,db,auth,DB_PATH,cargarDatosIniciales,guardarDatos,puedeEditarContrato,calcContabilidadAnio,
@@ -35,7 +37,7 @@ function showErr(msg){const d=document.getElementById('loginError');d.textConten
 
 window.cerrarSesion=async function(){
   if(!confirm('¿Cerrar sesión?'))return;
-  state.productos=[];state.movimientos=[];state.prestamos=[];state.contratos=[];state.contabAjustes={};
+  state.productos=[];state.movimientos=[];state.prestamos=[];state.contratos=[];state.contabAjustes={};state.personal=[];state.encuestas=[];
   _prestamoGruposAbiertos=new Set();
   state.nextId=27;state.nextMovId=17;state.nextPrestId=8;state.editId=null;state.esAdmin=false;state.esAsesor=false;
   _realtimeListenerActivo=false;
@@ -117,6 +119,7 @@ function renderDashboard(){
   if(!ul.length){c.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted);">Sin actividad reciente</div>';}
   else c.innerHTML=ul.map(m=>{const p=getProd(m.prodId);return`<div class="mov-item"><span class="mov-pill ${m.tipo}">${m.tipo.toUpperCase()}</span><div class="mov-info"><div class="mov-prod">${p?p.nombre:'—'}</div><div class="mov-meta">${fmtFecha(m.fecha)}${m.evento?' · 🎪 '+m.evento:''}${m.nota?' · '+m.nota:''}</div></div><div class="mov-qty ${m.tipo}">${m.qty>0?'+':''}${m.qty}</div></div>`;}).join('');
   renderContabilidad();
+  renderEncuestas();
 }
 
 function poblarSelectorAnioContab(){
@@ -234,6 +237,113 @@ window.borrarAjusteContabilidad=async function(){
   await guardarDatos();
   toast('🗑 Ajuste eliminado','ok');
 };
+
+// ── ENCUESTAS DE SATISFACCIÓN (carga desde plantilla Excel de Microsoft Forms) ──
+let encuestaDiasFiltro=new Set([0,1,2,3,4,5,6]);
+
+window.toggleDiaEncuesta=function(dow,checked){
+  if(checked)encuestaDiasFiltro.add(dow);else encuestaDiasFiltro.delete(dow);
+  renderEncuestas();
+};
+
+function _parseFechaEncuesta(v){
+  if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);
+  const s=String(v||'').trim();
+  if(!s)return'';
+  const d=new Date(s);
+  if(!isNaN(d))return d.toISOString().slice(0,10);
+  return s;
+}
+
+window.cargarPlantillaEncuestas=function(file){
+  if(!file)return;
+  if(typeof XLSX==='undefined'){toast('No se pudo cargar el lector de Excel — revisa tu conexión','err');return;}
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const filas=XLSX.utils.sheet_to_json(sheet,{defval:''});
+      if(!filas.length){toast('El archivo no tiene filas de datos','err');return;}
+      const headers=Object.keys(filas[0]);
+      const mapa={};
+      for(const campo of ENCUESTA_CAMPOS){
+        const h=headers.find(hh=>campo.match.some(k=>_normEncuestaHeader(hh).includes(k)));
+        if(h)mapa[campo.key]=h;
+      }
+      if(!mapa.fecha){toast('No se encontró una columna de fecha en el archivo','err');return;}
+      let importadas=0;
+      for(const fila of filas){
+        const val=k=>mapa[k]!==undefined?fila[mapa[k]]:'';
+        const fecha=_parseFechaEncuesta(val('fecha'));
+        if(!fecha)continue; // fila vacía o basura al final del archivo
+        state.encuestas.push({
+          id:state.nextEncuestaId++,
+          nombreCliente:String(val('nombreCliente')||'').trim(),
+          telefono:String(val('telefono')||'').trim(),
+          fecha,
+          recomendacion:Number(val('recomendacion'))||null,
+          satisfaccion:Number(val('satisfaccion'))||null,
+          coordinador:Number(val('coordinador'))||null,
+          puntualidad:Number(val('puntualidad'))||null,
+          sugerencia:String(val('sugerencia')||'').trim(),
+          mejora:String(val('mejora')||'').trim(),
+          fechaCarga:Date.now()
+        });
+        importadas++;
+      }
+      await guardarDatos();
+      renderEncuestas();
+      toast(`✅ ${importadas} encuesta(s) importada(s)`,'ok');
+    }catch(err){
+      console.error('Error al leer Excel de encuestas:',err);
+      toast('❌ Error al leer el archivo — verifica que sea la plantilla correcta','err');
+    }
+    document.getElementById('encuestaExcelInput').value='';
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+function renderEncuestas(){
+  const tbody=document.getElementById('encuesta-tbody');
+  const statsEl=document.getElementById('encuesta-stats');
+  if(!tbody)return;
+  const filtradas=state.encuestas.filter(e=>e.fecha&&encuestaDiasFiltro.has(new Date(e.fecha+'T12:00:00').getDay()));
+
+  const porFecha={};
+  for(const e of filtradas){
+    if(!porFecha[e.fecha])porFecha[e.fecha]={n:0,recomendacion:0,nRec:0,satisfaccion:0,nSat:0,coordinador:0,nCoo:0,puntualidad:0,nPun:0};
+    const g=porFecha[e.fecha];
+    g.n++;
+    if(e.recomendacion){g.recomendacion+=e.recomendacion;g.nRec++;}
+    if(e.satisfaccion){g.satisfaccion+=e.satisfaccion;g.nSat++;}
+    if(e.coordinador){g.coordinador+=e.coordinador;g.nCoo++;}
+    if(e.puntualidad){g.puntualidad+=e.puntualidad;g.nPun++;}
+  }
+  const fechas=Object.keys(porFecha).sort((a,b)=>b.localeCompare(a));
+  if(!fechas.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin encuestas cargadas para los días seleccionados</td></tr>';
+  }else{
+    tbody.innerHTML=fechas.map(f=>{
+      const g=porFecha[f];
+      const avg=(sum,n)=>n?(sum/n).toFixed(1):'—';
+      return`<tr><td>${fmtDate(f+'T12:00:00')} <span style="color:var(--muted);font-size:10px;">(${DIAS_SEMANA[new Date(f+'T12:00:00').getDay()]})</span></td><td>${g.n}</td><td>${avg(g.recomendacion,g.nRec)}</td><td>${avg(g.satisfaccion,g.nSat)}</td><td>${avg(g.coordinador,g.nCoo)}</td><td>${avg(g.puntualidad,g.nPun)}</td></tr>`;
+    }).join('');
+  }
+
+  const avgTotal=campo=>{
+    const vals=filtradas.map(e=>e[campo]).filter(v=>v);
+    return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):'—';
+  };
+  if(statsEl)statsEl.innerHTML=`
+    <div class="stat-card s-purple"><span class="stat-icon">📝</span><div class="stat-label">Encuestas</div><div class="stat-value">${filtradas.length}</div><div class="stat-sub">en el filtro actual</div></div>
+    <div class="stat-card s-orange"><span class="stat-icon">👍</span><div class="stat-label">Recomendación</div><div class="stat-value">${avgTotal('recomendacion')}</div><div class="stat-sub">promedio / 5</div></div>
+    <div class="stat-card s-green"><span class="stat-icon">😊</span><div class="stat-label">Satisfacción</div><div class="stat-value">${avgTotal('satisfaccion')}</div><div class="stat-sub">promedio / 5</div></div>
+    <div class="stat-card s-warn"><span class="stat-icon">🧭</span><div class="stat-label">Coordinador</div><div class="stat-value">${avgTotal('coordinador')}</div><div class="stat-sub">promedio / 5</div></div>
+  `;
+}
+window.renderEncuestas=renderEncuestas;
 
 function renderCatFilter(){const cats=[...new Set(state.productos.map(p=>p.cat))].sort();const sel=document.getElementById('filterCat');const cur=sel?sel.value:'';if(sel)sel.innerHTML='<option value="">Todas las categorías</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');}
 
@@ -1123,6 +1233,137 @@ function aplicarRol(){
   }
 }
 
+// ── PERSONAL (logísticos, recreadores, coordinadores, operarios) ────────────
+let editPersonalId=null;
+let dispPersonalId=null;
+
+function renderPersonal(){
+  const cont=document.getElementById('personalCards');
+  if(!cont)return;
+  const filtro=document.getElementById('filterRolPersonal')?.value||'';
+  const lista=state.personal.filter(p=>!filtro||p.rol===filtro);
+  if(!lista.length){cont.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted);"><span style="font-size:36px;display:block;margin-bottom:10px;">👥</span>Sin personal registrado</div>';return;}
+  const rolInfo=r=>ROLES_PERSONAL.find(x=>x.id===r)||{label:r,icon:'👤'};
+  cont.innerHTML=lista.map(p=>{
+    const r=rolInfo(p.rol);
+    const noDisp=(p.noDisponibleFechas||[]).length;
+    return`<div class="inv-card">
+      <div class="inv-card-name">${r.icon} ${p.nombre}</div>
+      <div class="inv-card-sku">${r.label}${p.edad?' · '+p.edad+' años':''}</div>
+      <div style="font-size:12px;color:var(--muted);margin:6px 0;">
+        📞 ${p.telefono||'—'}<br>
+        💳 ${p.cuentaTipo||'—'}<br>
+        🏠 ${p.direccion||'—'}
+      </div>
+      ${noDisp?`<div style="font-size:11px;color:var(--danger);font-weight:700;margin-bottom:6px;">🚫 ${noDisp} fecha(s) no disponible</div>`:''}
+      <div class="inv-card-footer">
+        <span></span>
+        <div style="display:flex;gap:5px;">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openDisponibilidadModal(${p.id})" title="Disponibilidad">📅</button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openPersonalModal(${p.id})" title="Editar">✎</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="eliminarPersonal(${p.id})" title="Eliminar">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.renderPersonal=renderPersonal;
+
+window.openPersonalModal=function(id=null){
+  editPersonalId=id;
+  document.getElementById('personalModalTitle').textContent=id?'Editar empleado':'Nuevo empleado';
+  if(id){
+    const p=getPersona(id);
+    document.getElementById('pe_nombre').value=p.nombre;
+    document.getElementById('pe_rol').value=p.rol;
+    document.getElementById('pe_edad').value=p.edad||'';
+    document.getElementById('pe_telefono').value=p.telefono||'';
+    document.getElementById('pe_cuenta_tipo').value=p.cuentaTipo||'Nequi';
+    document.getElementById('pe_direccion').value=p.direccion||'';
+  }else{
+    ['pe_nombre','pe_edad','pe_telefono','pe_direccion'].forEach(f=>document.getElementById(f).value='');
+    document.getElementById('pe_rol').value='logistico';
+    document.getElementById('pe_cuenta_tipo').value='Nequi';
+  }
+  document.getElementById('personalOverlay').classList.add('open');
+};
+window.closePersonalModal=function(){document.getElementById('personalOverlay').classList.remove('open');editPersonalId=null;};
+
+window.guardarPersonal=async function(){
+  const nombre=document.getElementById('pe_nombre').value.trim();
+  const rol=document.getElementById('pe_rol').value;
+  const edad=parseInt(document.getElementById('pe_edad').value)||null;
+  const telefono=document.getElementById('pe_telefono').value.trim();
+  const cuentaTipo=document.getElementById('pe_cuenta_tipo').value;
+  const direccion=document.getElementById('pe_direccion').value.trim();
+  if(!nombre){toast('Ingresa el nombre del empleado','err');return;}
+  if(telefono&&!telefonoValido(telefono)){toast('Teléfono inválido — debe iniciar en 3 y tener 10 dígitos','err');return;}
+  if(editPersonalId){
+    const p=getPersona(editPersonalId);
+    Object.assign(p,{nombre,rol,edad,telefono,cuentaTipo,direccion});
+    toast('✅ Empleado actualizado','ok');
+  }else{
+    state.personal.push({id:state.nextPersonalId++,nombre,rol,edad,telefono,cuentaTipo,direccion,noDisponibleFechas:[]});
+    toast('✅ Empleado registrado','ok');
+  }
+  closePersonalModal();renderPersonal();await guardarDatos();
+};
+
+window.eliminarPersonal=async function(id){
+  if(!confirm('¿Eliminar este empleado? También se quitará de cualquier evento donde esté programado.'))return;
+  state.personal=state.personal.filter(p=>p.id!==id);
+  // Quitar cualquier asignación de este empleado en contratos existentes
+  for(const c of state.contratos){
+    if(!c.personalAsignado)continue;
+    for(const rol of ROLES_PERSONAL){
+      if(c.personalAsignado[rol.id])c.personalAsignado[rol.id]=c.personalAsignado[rol.id].filter(pid=>pid!==id);
+    }
+  }
+  renderPersonal();await guardarDatos();toast('Empleado eliminado','warn');
+};
+
+window.openDisponibilidadModal=function(id){
+  dispPersonalId=id;
+  const p=getPersona(id);
+  document.getElementById('disp_nombre_label').textContent=p.nombre;
+  document.getElementById('disp_fecha').value='';
+  renderListaFechasNoDisponibles();
+  document.getElementById('disponibilidadOverlay').classList.add('open');
+};
+window.closeDisponibilidadModal=function(){document.getElementById('disponibilidadOverlay').classList.remove('open');dispPersonalId=null;renderPersonal();};
+
+function renderListaFechasNoDisponibles(){
+  const p=getPersona(dispPersonalId);
+  const cont=document.getElementById('disp_lista_fechas');
+  if(!p||!cont)return;
+  const fechas=[...(p.noDisponibleFechas||[])].sort();
+  if(!fechas.length){cont.innerHTML='<div style="color:var(--muted);">Disponible en todas las fechas.</div>';return;}
+  cont.innerHTML=fechas.map(f=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#fff3f3;border-radius:7px;margin-bottom:5px;">
+    <span>🚫 ${fmtDate(f+'T12:00:00')}</span>
+    <button onclick="quitarFechaNoDisponible('${f}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-weight:800;">✕</button>
+  </div>`).join('');
+}
+
+window.agregarFechaNoDisponible=async function(){
+  const fecha=document.getElementById('disp_fecha').value;
+  if(!fecha){toast('Selecciona una fecha','err');return;}
+  const p=getPersona(dispPersonalId);
+  if(!p)return;
+  if(!p.noDisponibleFechas)p.noDisponibleFechas=[];
+  if(!p.noDisponibleFechas.includes(fecha))p.noDisponibleFechas.push(fecha);
+  document.getElementById('disp_fecha').value='';
+  renderListaFechasNoDisponibles();
+  await guardarDatos();
+};
+
+window.quitarFechaNoDisponible=async function(fecha){
+  const p=getPersona(dispPersonalId);
+  if(!p)return;
+  p.noDisponibleFechas=(p.noDisponibleFechas||[]).filter(f=>f!==fecha);
+  renderListaFechasNoDisponibles();
+  await guardarDatos();
+};
+
 function renderVentasView(){
   ventaEmpresa=null;paqueteSeleccionado=null;
   window._ventaVariantesSel={};
@@ -1152,6 +1393,7 @@ window.seleccionarEmpresa=function(empresa){
   renderExtrasGrid();
   // Limpiar campos
   ['v_fecha','v_hora','v_hora_decoracion','v_cliente','v_tel1','v_tel2','v_direccion','v_barrio','v_localidad','v_festejado','v_anios','v_valor_paquete'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['v_pers_logistico','v_pers_recreador','v_pers_coordinador','v_pers_operario'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
   // Limpiar selección de variantes (personaje gigante, títeres, etc.)
   window._ventaVariantesSel={};
   paqueteSeleccionado=null;
@@ -1672,12 +1914,21 @@ window.registrarVenta=async function(){
   const valorPaqueteInput=parsePrecioInput(document.getElementById('v_valor_paquete')?.value||'');
   const valorFinal=valorPaqueteInput>0?valorPaqueteInput:pk.precio;
 
+  const requerimientosPersonal={
+    logistico:parseInt(document.getElementById('v_pers_logistico')?.value)||0,
+    recreador:parseInt(document.getElementById('v_pers_recreador')?.value)||0,
+    coordinador:parseInt(document.getElementById('v_pers_coordinador')?.value)||0,
+    operario:parseInt(document.getElementById('v_pers_operario')?.value)||0
+  };
+
   const contrato={
     id:state.nextContratoId++,empresa:ventaEmpresa,fecha,hora,horaDecoracion,cliente,tel1,tel2,
     direccion,barrio,localidad,festejado,paquete:pk.nombre,valor:valorFinal,valorCatalogo:pk.precio,
     items:[...pk.items,...extrasNombres],extras:extrasNombres,
     descontadosPaquete,fechaRegistro:Date.now(),
-    asesor:getAuth(app).currentUser?.email||''
+    asesor:getAuth(app).currentUser?.email||'',
+    requerimientosPersonal,
+    personalAsignado:{logistico:[],recreador:[],coordinador:[],operario:[]}
   };
   state.contratos.push(contrato);
   await guardarDatos();
@@ -1719,8 +1970,11 @@ function renderContratos(){
         <div class="contrato-meta">📅 ${fmtFechaContrato(c.fecha)} · ⏰ ${fmtHoraEvento(c)} · 🎉 ${c.paquete} · ${fmtPrecio(c.valor)}${(c.valorCatalogo&&c.valorCatalogo!==c.valor)?' <span style="color:var(--accent2);font-weight:700;">✨ precio especial</span>':''}</div>
         <div class="contrato-meta" style="margin-top:2px;">📍 ${c.barrio}, ${c.localidad} · Festejado: ${c.festejado||'—'}</div>
       </div>
+      ${state.esAdmin?renderResumenPersonalContrato(c):''}
       <div style="display:flex;gap:6px;flex-shrink:0;">
-        ${autorizado?`
+        ${state.esAdmin?`
+        <button class="btn btn-purple btn-sm" onclick="abrirProgramarPersonal(${c.id})">📋 Programar personal</button>
+        `:autorizado?`
         <button class="btn btn-ghost btn-sm" onclick="editarContrato(${c.id})" title="Editar contrato">✏️ Editar</button>
         <button class="btn btn-${c.empresa==='happy'?'primary':'purple'} btn-sm" onclick="descargarContratoPDF(${c.id})">⬇ PDF</button>
         <button class="btn btn-danger btn-sm" onclick="borrarContrato(${c.id})">🗑 Borrar</button>
@@ -1728,6 +1982,104 @@ function renderContratos(){
       </div>
     </div>`;}).join('');
 }
+
+// Pequeño resumen "X/Y asignados" por rol, visible solo para el admin en la lista de Contratos.
+function renderResumenPersonalContrato(c){
+  const req=c.requerimientosPersonal;
+  if(!req)return'';
+  const asign=c.personalAsignado||{};
+  const partes=ROLES_PERSONAL.filter(r=>req[r.id]>0).map(r=>{
+    const asignados=(asign[r.id]||[]).length;
+    const completo=asignados>=req[r.id];
+    return`<span style="${completo?'color:var(--success);':'color:var(--warn);'}font-weight:700;">${r.icon} ${asignados}/${req[r.id]}</span>`;
+  });
+  if(!partes.length)return'<div style="font-size:11px;color:var(--muted);margin:4px 0;">Sin personal solicitado para este evento</div>';
+  return`<div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap;margin:4px 0;">${partes.join('')}</div>`;
+}
+
+// ── PROGRAMACIÓN DE PERSONAL POR CONTRATO (solo admin) ──────────────────────
+let programarPersonalContratoId=null;
+let programarPersonalSel=null; // {logistico:[id|null,...], recreador:[...], ...} — copia de trabajo
+
+window.abrirProgramarPersonal=function(id){
+  const c=state.contratos.find(x=>x.id===id);
+  if(!c)return;
+  programarPersonalContratoId=id;
+  const req=c.requerimientosPersonal||{logistico:0,recreador:0,coordinador:0,operario:0};
+  const asign=c.personalAsignado||{};
+  programarPersonalSel={};
+  for(const rol of ROLES_PERSONAL){
+    const cupos=req[rol.id]||0;
+    const previos=asign[rol.id]||[];
+    programarPersonalSel[rol.id]=Array.from({length:cupos},(_,i)=>previos[i]??null);
+  }
+  document.getElementById('pp_resumen').innerHTML=`<strong>${c.cliente}</strong> — 📅 ${fmtFechaContrato(c.fecha)} · 🎉 ${c.paquete}`;
+  renderProgramarPersonalBody();
+  document.getElementById('programarPersonalOverlay').classList.add('open');
+};
+
+window.closeProgramarPersonal=function(){
+  document.getElementById('programarPersonalOverlay').classList.remove('open');
+  programarPersonalContratoId=null;programarPersonalSel=null;
+};
+
+function renderProgramarPersonalBody(){
+  const cont=document.getElementById('pp_body');
+  if(!cont||!programarPersonalSel)return;
+  const c=state.contratos.find(x=>x.id===programarPersonalContratoId);
+  if(!c)return;
+  const fecha=c.fecha;
+  // ids ya elegidos en CUALQUIER rol de este mismo formulario, para no repetir a la misma persona en dos cupos
+  const yaElegidos=new Set(Object.values(programarPersonalSel).flat().filter(Boolean));
+  let html='';
+  for(const rol of ROLES_PERSONAL){
+    const slots=programarPersonalSel[rol.id];
+    if(!slots.length)continue;
+    html+=`<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">${rol.icon} ${rol.label} (${slots.length})</div>`;
+    slots.forEach((seleccionadoId,idx)=>{
+      const candidatos=state.personal.filter(p=>p.rol===rol.id);
+      const opciones=candidatos.map(p=>{
+        const noDisponible=!estaDisponible(p,fecha);
+        const ocupadoOtroEvento=personaAsignadaEnFecha(p.id,fecha,c.id);
+        const elegidoEnOtroCupo=yaElegidos.has(p.id)&&seleccionadoId!==p.id;
+        const deshabilitado=noDisponible||ocupadoOtroEvento||elegidoEnOtroCupo;
+        let etiqueta=p.nombre;
+        if(noDisponible)etiqueta+=' — 🚫 no disponible esta fecha';
+        else if(ocupadoOtroEvento)etiqueta+=' — ⚠️ ya asignado a otro evento este día';
+        else if(elegidoEnOtroCupo)etiqueta+=' — ya elegido arriba';
+        return`<option value="${p.id}" ${seleccionadoId===p.id?'selected':''} ${deshabilitado?'disabled':''}>${etiqueta}</option>`;
+      }).join('');
+      html+=`<select onchange="onCambioSlotPersonal('${rol.id}',${idx},this.value)" style="margin-bottom:6px;width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:13px;">
+        <option value="">— Cupo ${idx+1}: sin asignar —</option>
+        ${opciones}
+      </select>`;
+    });
+    html+='</div>';
+  }
+  if(!html)html='<div style="color:var(--muted);font-size:13px;">Este contrato no solicitó personal.</div>';
+  cont.innerHTML=html;
+}
+
+window.onCambioSlotPersonal=function(rolId,idx,valor){
+  programarPersonalSel[rolId][idx]=valor?parseInt(valor):null;
+  renderProgramarPersonalBody();
+};
+
+window.guardarProgramacionPersonal=async function(){
+  const c=state.contratos.find(x=>x.id===programarPersonalContratoId);
+  if(!c||!programarPersonalSel)return;
+  // Verificación final anti-duplicados (por si acaso) antes de guardar.
+  const todos=Object.values(programarPersonalSel).flat().filter(Boolean);
+  if(new Set(todos).size!==todos.length){toast('No puedes asignar la misma persona en dos cupos del mismo evento','err');return;}
+  if(!c.personalAsignado)c.personalAsignado={};
+  for(const rol of ROLES_PERSONAL){
+    c.personalAsignado[rol.id]=programarPersonalSel[rol.id].filter(Boolean);
+  }
+  await guardarDatos();
+  closeProgramarPersonal();
+  renderContratos();
+  toast('✅ Personal programado','ok');
+};
 
 window.filtrarContratosFecha=function(){
   const fecha=document.getElementById('contrato-fecha-filtro')?.value||'';
@@ -1833,6 +2185,11 @@ window.editarContrato=function(id){
   document.getElementById('ec_barrio').value=c.barrio||'';
   document.getElementById('ec_localidad').value=c.localidad||'';
   document.getElementById('ec_festejado').value=c.festejado||'';
+  const ecReq=c.requerimientosPersonal||{logistico:0,recreador:0,coordinador:0,operario:0};
+  document.getElementById('ec_pers_logistico').value=ecReq.logistico||0;
+  document.getElementById('ec_pers_recreador').value=ecReq.recreador||0;
+  document.getElementById('ec_pers_coordinador').value=ecReq.coordinador||0;
+  document.getElementById('ec_pers_operario').value=ecReq.operario||0;
   // Renderizar selector de paquetes en el modal
   const wrap=document.getElementById('ec_paquetes_wrap');
   const isCondePurple=c.empresa==='conde';
@@ -1978,6 +2335,26 @@ window.guardarEdicionContrato=async function(){
   c.barrio=document.getElementById('ec_barrio').value.trim();
   c.localidad=document.getElementById('ec_localidad').value.trim();
   c.festejado=document.getElementById('ec_festejado').value.trim();
+  const nuevoReq={
+    logistico:parseInt(document.getElementById('ec_pers_logistico')?.value)||0,
+    recreador:parseInt(document.getElementById('ec_pers_recreador')?.value)||0,
+    coordinador:parseInt(document.getElementById('ec_pers_coordinador')?.value)||0,
+    operario:parseInt(document.getElementById('ec_pers_operario')?.value)||0
+  };
+  c.requerimientosPersonal=nuevoReq;
+  if(!c.personalAsignado)c.personalAsignado={logistico:[],recreador:[],coordinador:[],operario:[]};
+  // Si el asesor bajó la cantidad requerida por debajo de lo ya programado por
+  // el admin, se recorta el sobrante para que la programación nunca quede por
+  // encima del nuevo límite.
+  let recorte=false;
+  for(const rol of ROLES_PERSONAL){
+    const asignados=c.personalAsignado[rol.id]||[];
+    if(asignados.length>nuevoReq[rol.id]){
+      c.personalAsignado[rol.id]=asignados.slice(0,nuevoReq[rol.id]);
+      recorte=true;
+    }
+  }
+  if(recorte)toast('⚠️ Se ajustó el personal ya programado al nuevo límite solicitado','warn');
   // Actualizar paquete si cambió
   let pkRef=PAQUETES.find(p=>p.nombre===c.paquete);
   if(window._ecPkSeleccionado){
@@ -2357,7 +2734,8 @@ window.showView=function(v){
     alertas:renderAlertas,
     ventas:renderVentasView,
     contratos:renderContratos,
-    calendario:renderCalendario
+    calendario:renderCalendario,
+    personal:renderPersonal
   };
   if(handlers[v])handlers[v]();
   closeSidebar();

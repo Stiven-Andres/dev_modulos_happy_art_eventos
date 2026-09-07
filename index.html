@@ -358,6 +358,7 @@ td.col-actions{text-align:right;}
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -402,6 +403,7 @@ td.col-actions{text-align:right;}
   <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard"><span class="nav-icon">🏠</span>Dashboard</button>
   <button class="nav-btn" onclick="showView('productos')" id="nav-productos"><span class="nav-icon">📦</span>Inventario</button>
   <button class="nav-btn" onclick="showView('calendario')" id="nav-calendario"><span class="nav-icon">📅</span>Calendario</button>
+  <button class="nav-btn admin-only" onclick="showView('personal')" id="nav-personal" style="display:none;"><span class="nav-icon">👥</span>Personal</button>
   <div class="nav-section">Operaciones</div>
   <button class="nav-btn" onclick="showView('movimientos')" id="nav-movimientos"><span class="nav-icon">↕️</span>Movimientos</button>
   <button class="nav-btn" onclick="showView('prestamos')" id="nav-prestamos"><span class="nav-icon">🔄</span>Préstamos</button>
@@ -455,6 +457,40 @@ td.col-actions{text-align:right;}
         </thead>
         <tbody id="contab-tbody"></tbody>
         <tfoot id="contab-tfoot"></tfoot>
+      </table>
+    </div>
+
+    <div class="contab-header">
+      <div><div style="font-family:var(--font-head);font-size:16px;font-weight:800;">📝 Encuestas de Satisfacción</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Resultados que los clientes diligencian en el formulario de Microsoft Forms</div></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input type="file" id="encuestaExcelInput" accept=".xlsx,.xls" style="display:none;" onchange="cargarPlantillaEncuestas(this.files[0])">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('encuestaExcelInput').click()">📤 Cargar plantilla Excel</button>
+      </div>
+    </div>
+    <div class="date-filter-bar" style="flex-wrap:wrap;">
+      <label style="margin-right:4px;">📆 Filtrar por día de la semana:</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="0" onchange="toggleDiaEncuesta(0,this.checked)"> Dom</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="1" onchange="toggleDiaEncuesta(1,this.checked)"> Lun</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="2" onchange="toggleDiaEncuesta(2,this.checked)"> Mar</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="3" onchange="toggleDiaEncuesta(3,this.checked)"> Mié</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="4" onchange="toggleDiaEncuesta(4,this.checked)"> Jue</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="5" onchange="toggleDiaEncuesta(5,this.checked)"> Vie</label>
+      <label style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;"><input type="checkbox" checked data-dow="6" onchange="toggleDiaEncuesta(6,this.checked)"> Sáb</label>
+    </div>
+    <div class="stats" id="encuesta-stats" style="margin-bottom:16px;"></div>
+    <div class="contab-table-wrap">
+      <table class="contab-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Encuestas</th>
+            <th>👍 Recomendación</th>
+            <th>😊 Satisfacción</th>
+            <th>🧭 Coordinador</th>
+            <th>⏰ Puntualidad</th>
+          </tr>
+        </thead>
+        <tbody id="encuesta-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -517,6 +553,23 @@ td.col-actions{text-align:right;}
       <div id="cal-detalle-lista"></div>
       <div id="cal-reporte-materiales" style="margin-top:16px;"></div>
     </div>
+  </div>
+  <!-- VISTA PERSONAL (solo admin) -->
+  <div class="view" id="view-personal">
+    <div class="topbar">
+      <div><div class="page-title">Personal 👥</div><div class="page-subtitle">Logísticos, recreadores, coordinadores y operarios de la empresa</div></div>
+      <div class="topbar-actions"><button class="btn btn-primary" onclick="openPersonalModal()">+ Nuevo empleado</button></div>
+    </div>
+    <div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <select class="filter-sel" id="filterRolPersonal" onchange="renderPersonal()">
+        <option value="">Todos los roles</option>
+        <option value="logistico">🚚 Logísticos</option>
+        <option value="recreador">🎭 Recreadores</option>
+        <option value="coordinador">🧭 Coordinadores</option>
+        <option value="operario">🔧 Operarios</option>
+      </select>
+    </div>
+    <div class="inv-cards" id="personalCards"></div>
   </div>
   <div class="view" id="view-movimientos">
     <div class="topbar">
@@ -679,6 +732,11 @@ td.col-actions{text-align:right;}
             </div>
             <div class="extras-selected-list" id="venta-extras-chips" style="margin-top:10px;"></div>
           </div>
+          <div class="venta-section full">👥 Personal necesario para el evento</div>
+          <div class="field"><label>🚚 Logísticos</label><input type="number" id="v_pers_logistico" value="0" min="0" oninput="noNegativo(this)"></div>
+          <div class="field"><label>🎭 Recreadores</label><input type="number" id="v_pers_recreador" value="0" min="0" oninput="noNegativo(this)"></div>
+          <div class="field"><label>🧭 Coordinadores</label><input type="number" id="v_pers_coordinador" value="0" min="0" oninput="noNegativo(this)"></div>
+          <div class="field"><label>🔧 Operarios</label><input type="number" id="v_pers_operario" value="0" min="0" oninput="noNegativo(this)"></div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:24px;padding-top:16px;border-top:1.5px solid var(--border);">
           <button class="btn btn-primary" id="btn-registrar-venta" onclick="registrarVenta()" style="font-size:15px;padding:12px 28px;">📄 Registrar y Generar Contrato</button>
@@ -741,6 +799,63 @@ td.col-actions{text-align:right;}
       <div class="field full"><label>Descripción / Observaciones</label><textarea id="f_desc" placeholder="Color, tamaño, condición, notas..."></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarProducto()">💾 Guardar artículo</button></div>
+  </div>
+</div>
+
+<!-- MODAL PERSONAL (crear/editar empleado) -->
+<div class="overlay" id="personalOverlay">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">👥 <span id="personalModalTitle">Nuevo empleado</span></span><button class="close-btn" onclick="closePersonalModal()">✕</button></div>
+    <div class="form-grid">
+      <div class="field full"><label>Nombre completo</label><input type="text" id="pe_nombre" placeholder="Ej: Carlos Ramírez" oninput="soloLetras(this)"></div>
+      <div class="field"><label>Rol</label>
+        <select id="pe_rol">
+          <option value="logistico">🚚 Logístico</option>
+          <option value="recreador">🎭 Recreador</option>
+          <option value="coordinador">🧭 Coordinador</option>
+          <option value="operario">🔧 Operario</option>
+        </select>
+      </div>
+      <div class="field"><label>Edad</label><input type="number" id="pe_edad" placeholder="Ej: 28" min="18" max="80" oninput="noNegativo(this)"></div>
+      <div class="field"><label>Teléfono</label><input type="tel" id="pe_telefono" placeholder="3102112655" inputmode="numeric" maxlength="10" oninput="soloDigitosTelefono(this)"></div>
+      <div class="field"><label>Tipo de cuenta de pago</label>
+        <select id="pe_cuenta_tipo">
+          <option>Nequi</option><option>Llave</option><option>Daviplata</option><option>Bancolombia</option><option>Efectivo</option>
+        </select>
+      </div>
+      <div class="field full"><label>Dirección de residencia</label><input type="text" id="pe_direccion" placeholder="Ej: Calle 80 # 20-15" oninput="aMayusculas(this)"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closePersonalModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarPersonal()">💾 Guardar empleado</button></div>
+  </div>
+</div>
+
+<!-- MODAL DISPONIBILIDAD DE PERSONAL -->
+<div class="overlay" id="disponibilidadOverlay">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">📅 Disponibilidad de <span id="disp_nombre_label"></span></span><button class="close-btn" onclick="closeDisponibilidadModal()">✕</button></div>
+    <div class="form-grid">
+      <div class="field full"><label>Marcar fecha como NO disponible</label>
+        <div style="display:flex;gap:8px;">
+          <input type="date" id="disp_fecha" style="flex:1;">
+          <button class="btn btn-danger btn-sm" onclick="agregarFechaNoDisponible()">🚫 Marcar no disponible</button>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Fechas marcadas como no disponibles</label>
+        <div id="disp_lista_fechas" style="font-size:13px;"></div>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeDisponibilidadModal()">Listo</button></div>
+  </div>
+</div>
+
+<!-- MODAL PROGRAMAR PERSONAL (solo admin, desde Contratos) -->
+<div class="overlay" id="programarPersonalOverlay">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">📋 Programar personal</span><button class="close-btn" onclick="closeProgramarPersonal()">✕</button></div>
+    <div style="font-size:13px;margin-bottom:14px;" id="pp_resumen"></div>
+    <div id="pp_body"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeProgramarPersonal()">Cancelar</button><button class="btn btn-primary" onclick="guardarProgramacionPersonal()">💾 Guardar programación</button></div>
   </div>
 </div>
 
@@ -810,6 +925,11 @@ td.col-actions{text-align:right;}
         <div class="extras-dropdown" id="ec-extras-dropdown"></div>
       </div>
       <div class="full" id="ec-extras-chips" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div class="section-divider">👥 Personal necesario para el evento</div>
+      <div class="field"><label>🚚 Logísticos</label><input type="number" id="ec_pers_logistico" value="0" min="0" oninput="noNegativo(this)"></div>
+      <div class="field"><label>🎭 Recreadores</label><input type="number" id="ec_pers_recreador" value="0" min="0" oninput="noNegativo(this)"></div>
+      <div class="field"><label>🧭 Coordinadores</label><input type="number" id="ec_pers_coordinador" value="0" min="0" oninput="noNegativo(this)"></div>
+      <div class="field"><label>🔧 Operarios</label><input type="number" id="ec_pers_operario" value="0" min="0" oninput="noNegativo(this)"></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeEditContrato()">Cancelar</button><button class="btn btn-primary" onclick="guardarEdicionContrato()">💾 Guardar cambios</button></div>
   </div>
