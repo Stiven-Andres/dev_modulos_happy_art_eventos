@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Préstamos — EventStock{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="fw-bold mb-0">Préstamos 🔄</h3>
+    <div class="text-muted">Préstamos activos y devueltos, agrupados por evento</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/prestamos/wizard" class="btn btn-purple text-white fw-bold" style="background:#6f42c1;">📦 Préstamo de paquete</a>
+    <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalPrestamoSimple">+ Préstamo de un artículo</button>
+  </div>
+</div>
+
+{% if not grupos %}
+<div class="text-center text-muted py-5"><span class="display-4">🔄</span><br>Sin préstamos registrados</div>
+{% endif %}
+
+<div class="accordion" id="prestamosAccordion">
+  {% for g in grupos %}
+  <div class="accordion-item mb-2">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#grp{{ loop.index }}">
+        <div class="flex-grow-1">
+          <div class="fw-bold">👤 {{ g.coordinador or 'Sin coordinador' }} <span class="text-muted fw-normal">· 🎪 {{ g.cliente }}</span></div>
+          <div class="small text-muted">{% if g.paquete %}📦 {{ g.paquete }} · {% endif %}{{ g.items|length }} artículo(s) · Salida: {{ fmt_date(g.salida) }}{% if g.retorno %} · Retorno: {{ fmt_date(g.retorno) }}{% endif %}</div>
+        </div>
+        {% if g.pendientes == 0 %}<span class="badge badge-ok ms-2">✅ Todo devuelto</span>
+        {% elif g.vencido %}<span class="badge badge-out ms-2">❌ Vencido · {{ g.pendientes }} pend.</span>
+        {% else %}<span class="badge badge-low ms-2">⏳ {{ g.pendientes }} pendiente{{ 's' if g.pendientes > 1 }}</span>{% endif %}
+      </button>
+    </h2>
+    <div class="accordion-collapse collapse" data-bs-parent="#prestamosAccordion" id="grp{{ loop.index }}">
+      <div class="accordion-body">
+        {% for pr in g.items %}
+        <div class="d-flex align-items-center gap-3 border-bottom py-2">
+          <div class="flex-grow-1">
+            <div class="fw-bold">{{ pr.prod_nombre }}{% if pr.prod_nombre_sec %} <span class="text-muted fw-normal">· {{ pr.prod_nombre_sec }}</span>{% endif %}</div>
+            <div class="small text-muted">Cantidad: <strong>{{ pr.qty }}</strong>{% if pr.nota %} · {{ pr.nota }}{% endif %}</div>
+          </div>
+          {% if pr.devuelto %}<span class="badge badge-ok">✅ Devuelto</span>
+          {% elif pr.vencido %}<span class="badge badge-out">❌ Vencido</span>
+          {% else %}<span class="badge badge-low">⏳ Activo</span>{% endif %}
+          {% if not pr.devuelto %}
+          <form method="post" action="/prestamos/{{ pr.id }}/devolver">
+            <button class="btn btn-sm" style="background:#6f42c1;color:#fff;">↩ Devolver</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="modal fade" id="modalPrestamoSimple" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/prestamos/nuevo">
+        <div class="modal-header"><h5 class="modal-title">🔄 Registrar Préstamo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-3">
+          <div class="col-12"><label class="form-label">Artículo a prestar</label>
+            <select class="form-select" name="prodId" required>
+              <option value="">— Seleccionar artículo —</option>
+              {% for p in productos if p.stock > 0 %}<option value="{{ p.id }}">{{ p.nombre }} · Disponible: {{ p.stock }} {{ p.unidad }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Cantidad</label><input type="number" min="1" class="form-control" name="qty" required></div>
+          <div class="col-md-6"><label class="form-label">Fecha retorno esperada</label><input type="date" class="form-control" name="retorno"></div>
+          <div class="col-12"><label class="form-label">Cliente / Evento</label><input class="form-control" name="cliente" required></div>
+          <div class="col-12"><label class="form-label">Observaciones</label><input class="form-control" name="nota"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn fw-bold text-white" style="background:#6f42c1;">🔄 Confirmar préstamo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

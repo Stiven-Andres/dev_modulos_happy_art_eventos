@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Préstamo de paquete — EventStock{% endblock %}
+{% block content %}
+<a href="/prestamos" class="btn btn-sm btn-outline-secondary mb-3">← Volver a Préstamos</a>
+<h3 class="fw-bold mb-3">📦 Préstamo de paquete completo</h3>
+
+<div class="d-flex gap-2 mb-4">
+  <span class="badge {{ 'text-bg-dark' if paso==1 else 'text-bg-secondary' }}">1. Paquete</span>
+  <span class="badge {{ 'text-bg-dark' if paso==2 else 'text-bg-secondary' }}">2. Materiales</span>
+  <span class="badge {{ 'text-bg-dark' if paso==3 else 'text-bg-secondary' }}">3. Datos del préstamo</span>
+</div>
+
+{% if paso == 1 %}
+{% for c in categorias %}
+{% set pkgs = paquetes_por_cat[c.id] %}
+{% if pkgs %}
+<div class="small fw-bold text-muted text-uppercase mb-2 mt-3">{{ c.label }}</div>
+<div class="row row-cols-2 row-cols-md-4 g-2 mb-2">
+  {% for p in pkgs %}
+  <div class="col">
+    <form method="post" action="/prestamos/wizard/seleccionar">
+      <input type="hidden" name="pkId" value="{{ p.id }}">
+      <button type="submit" class="paquete-card w-100 h-100 text-start p-2 bg-white">
+        <div class="fw-bold small">{{ p.nombreHappy }}</div>
+        <div class="text-muted" style="font-size:10px;">{{ p.nombreConde }}</div>
+        <div class="text-muted small mt-1">{{ p.items|length }} ítems</div>
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if paso == 2 %}
+<div class="fw-bold fs-5 mb-3">📦 {{ pk.nombre if pk }}</div>
+
+<h6>🔵 Materiales a devolver</h6>
+{% if not draft.returnItems %}
+<div class="text-muted small mb-3">Ningún material recuperable en este paquete</div>
+{% endif %}
+{% for item in draft.returnItems %}
+<div class="card mb-2">
+  <div class="card-body py-2">
+    <div class="fw-bold small">{{ item.name }}</div>
+    {% if item.necesitaVariante %}
+    <div class="small mb-2" style="color:#a05a00;">⚠️ Hay {{ item.variantes|length }} tipos — elige uno o varios · Stock total: {{ item.variantes|sum(attribute='stock') }} unid.</div>
+    {% set outer_idx = loop.index0 %}
+    {% for linea in item.seleccionesVariante %}
+    <form method="post" action="/prestamos/wizard/paso2/variante" class="d-flex gap-2 align-items-center mb-1 flex-wrap">
+      <input type="hidden" name="idx" value="{{ outer_idx }}">
+      <input type="hidden" name="linea" value="{{ loop.index0 }}">
+      <select name="prodId" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+        <option value="">— Elegir tipo específico —</option>
+        {% for v in item.variantes %}<option value="{{ v.id }}" {{ 'selected' if linea.prodId==v.id }} {{ 'disabled' if v.stock<=0 }}>{{ v.sku }}{% if v.desc %} · {{ v.desc }}{% endif %} — {{ v.stock }} disp.{% if v.stock<=0 %} (agotado){% endif %}</option>{% endfor %}
+      </select>
+      <input type="number" min="1" name="qty" value="{{ linea.qty }}" class="form-control form-control-sm" style="width:70px;" onchange="this.form.submit()">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Guardar</button>
+    </form>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-1">
+      <form method="post" action="/prestamos/wizard/paso2/agregar-linea">
+        <input type="hidden" name="idx" value="{{ loop.index0 }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">+ Agregar otro tipo</button>
+      </form>
+      {% if item.seleccionesVariante|length > 1 %}
+      <form method="post" action="/prestamos/wizard/paso2/quitar-linea">
+        <input type="hidden" name="idx" value="{{ loop.index0 }}">
+        <input type="hidden" name="linea" value="{{ item.seleccionesVariante|length - 1 }}">
+        <button type="submit" class="btn btn-sm btn-outline-danger">Quitar última línea</button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    {% if item.fromInventory and item.prod %}
+    <div class="small text-success mb-1">En inventario · {{ item.prod.nombre }}{% if item.prod.sku %} ({{ item.prod.sku }}){% endif %}</div>
+    <form method="post" action="/prestamos/wizard/paso2/qty" class="d-flex gap-2 align-items-center">
+      <input type="hidden" name="idx" value="{{ loop.index0 }}">
+      <input type="number" min="0" max="{{ item.prod.stock }}" name="qty" value="{{ item.qty }}" class="form-control form-control-sm" style="width:70px;" onchange="this.form.submit()">
+      <span class="small text-muted">{{ item.prod.unidad }} · {{ item.prod.stock }} disp.</span>
+    </form>
+    {% else %}
+    <div class="small text-muted">Sin coincidencia en inventario — manual</div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<h6 class="mt-4">🟠 Materiales que se consumen</h6>
+{% if not draft.consumeItems %}
+<div class="text-muted small mb-3">Ningún consumible en este paquete</div>
+{% endif %}
+{% for name in draft.consumeItems %}
+<div class="small border-bottom py-1">{{ name }} <span class="text-muted">— se consume, no regresa</span></div>
+{% endfor %}
+
+<h6 class="mt-4">➕ Artículos adicionales</h6>
+<div class="position-relative mb-2" style="max-width:420px;">
+  <input type="text" class="form-control" placeholder="Buscar por nombre, código o categoría..."
+    hx-get="/prestamos/wizard/extras/buscar" hx-trigger="keyup changed delay:300ms" hx-target="#extrasDropdown" name="q">
+  <div id="extrasDropdown"></div>
+</div>
+{% for e in extras %}
+<div class="d-flex align-items-center gap-2 mb-1">
+  <span class="flex-grow-1">{{ e.prod.nombre }} <span class="text-muted small">(disp: {{ e.prod.stock }})</span></span>
+  <form method="post" action="/prestamos/wizard/extras/qty" class="d-flex align-items-center gap-1">
+    <input type="hidden" name="prodId" value="{{ e.prod.id }}">
+    <input type="number" min="1" max="{{ e.prod.stock }}" name="qty" value="{{ e.qty }}" class="form-control form-control-sm" style="width:60px;" onchange="this.form.submit()">
+  </form>
+  <form method="post" action="/prestamos/wizard/extras/quitar"><input type="hidden" name="prodId" value="{{ e.prod.id }}"><button class="btn btn-sm btn-outline-danger">✕</button></form>
+</div>
+{% endfor %}
+
+<div class="d-flex justify-content-end mt-4">
+  <a href="/prestamos/wizard/paso3" class="btn btn-warning fw-bold">Continuar →</a>
+</div>
+{% endif %}
+
+{% if paso == 3 %}
+<form method="post" action="/prestamos/wizard/confirmar" class="row g-3" style="max-width:640px;">
+  <div class="col-md-6"><label class="form-label">Coordinador responsable</label><input class="form-control" name="coordinador"></div>
+  <div class="col-md-6"><label class="form-label">Fecha del evento</label><input type="date" class="form-control" name="fecha_evento"></div>
+  <div class="col-md-6"><label class="form-label">Cliente / festejado</label><input class="form-control" name="cliente" required></div>
+  <div class="col-md-6"><label class="form-label">Fecha de devolución esperada</label><input type="date" class="form-control" name="retorno" value="{{ retorno_default }}"></div>
+  <div class="col-12"><label class="form-label">Observaciones</label><input class="form-control" name="nota" placeholder="Dirección del evento, notas adicionales..."></div>
+  <div class="col-12 d-flex justify-content-between">
+    <a href="/prestamos/wizard/paso2" class="btn btn-outline-secondary">← Volver</a>
+    <button type="submit" class="btn btn-warning fw-bold">✅ Confirmar préstamo</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

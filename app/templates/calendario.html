@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Calendario — EventStock{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h3 class="fw-bold mb-0">Calendario 📅</h3>
+  <div class="d-flex gap-2 align-items-center">
+    <a class="btn btn-outline-secondary btn-sm" href="/calendario?anio={{ prev_anio }}&mes={{ prev_mes }}">←</a>
+    <div class="fw-bold">{{ mes_nombre }} {{ anio }}</div>
+    <a class="btn btn-outline-secondary btn-sm" href="/calendario?anio={{ next_anio }}&mes={{ next_mes }}">→</a>
+    <a class="btn btn-warning btn-sm" href="/calendario">Hoy</a>
+  </div>
+</div>
+
+<div class="row row-cols-7 g-1 text-center small fw-bold text-muted mb-1">
+  {% for d in ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'] %}<div class="col">{{ d }}</div>{% endfor %}
+</div>
+{% for semana in semanas %}
+<div class="row row-cols-7 g-1 mb-1">
+  {% for dia, fecha_str in semana %}
+  <div class="col">
+    {% if dia %}
+    {% set c = conteos.get(fecha_str, {'happy':0,'conde':0}) %}
+    {% set total = c.happy + c.conde %}
+    <a href="/calendario?anio={{ anio }}&mes={{ mes }}&dia={{ fecha_str }}" class="text-decoration-none">
+      <div class="day-cell {{ 'has-events' if total > 0 }} {{ 'border-warning border-2' if fecha_str==hoy_str }}">
+        <div class="fw-bold text-dark">{{ dia }}</div>
+        {% if c.happy %}<div class="badge text-bg-warning">🎪 {{ c.happy }}</div>{% endif %}
+        {% if c.conde %}<div class="badge" style="background:#6f42c1;color:#fff;">🎭 {{ c.conde }}</div>{% endif %}
+      </div>
+    </a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% if dia_seleccionado and not detalle %}
+<div class="alert alert-warning mt-3">Sin eventos registrados para ese día</div>
+{% endif %}
+
+{% if detalle %}
+<div class="card mt-4">
+  <div class="card-body">
+    <h5>📌 Eventos del {{ fmt_date(detalle.fecha ~ 'T12:00:00') }}</h5>
+    {% for c in detalle.eventos %}
+    <div class="border-bottom py-2 d-flex justify-content-between flex-wrap">
+      <div><strong>{{ c.cliente }}</strong> — {{ c.paquete }}
+        <span class="small text-muted">{{ '🎭 Conde Eventos' if c.empresa=='conde' else '🎪 Happy Art Eventos' }} · {{ fmt_hora_evento(c) }}</span>
+        <span class="small text-muted">Asesor: {{ c.asesor or '—' }}</span>
+      </div>
+      <div class="small text-muted">Festejado: {{ c.festejado or '—' }}</div>
+    </div>
+    {% endfor %}
+
+    <h6 class="mt-4">📦 Reporte de materiales para esta fecha</h6>
+    {% if not detalle.resumen %}
+    <div class="small text-muted">Sin materiales de inventario asociados a los eventos de este día.</div>
+    {% else %}
+    <div class="card mb-3">
+      <div class="card-header bg-warning-subtle fw-bold small">📊 Resumen consolidado — todos los eventos del día</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Material</th><th class="text-center">Total necesario</th><th class="text-center">Stock total</th><th class="text-center">Libre / faltante</th></tr></thead>
+        <tbody>
+          {% for f in detalle.resumen %}
+          <tr>
+            <td>{{ '🔴' if f.agotado else ('🟡' if f.libre==0 else '🟢') }} {{ f.etiqueta }}{% if f.no_en_inventario %} <span class="text-muted">(no está en inventario)</span>{% endif %}</td>
+            <td class="text-center fw-bold text-warning">{{ f.qty }}</td>
+            <td class="text-center">{{ f.stock_total }}</td>
+            <td class="text-center fw-bold {{ 'text-danger' if f.agotado else ('text-warning' if f.libre==0 else 'text-success') }}">{{ 'Faltan ' ~ (f.libre|abs) if f.agotado else f.libre }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="small text-muted fw-bold mb-2">DETALLE POR EVENTO</div>
+    {% for d in detalle.detalle_contratos %}
+    <div class="card mb-2">
+      <div class="card-header small"><strong>{{ d.contrato.cliente }}</strong> — {{ d.contrato.paquete }} · {{ 'Conde Eventos' if d.contrato.empresa=='conde' else 'Happy Art Eventos' }}
+        <span class="text-muted float-end">Asesor: {{ d.contrato.asesor or '—' }}</span></div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Material</th><th class="text-center">Cant. usada</th><th class="text-center">Stock total</th><th class="text-center">Libre ese día</th></tr></thead>
+        <tbody>
+          {% for f in d.filas %}
+          <tr>
+            <td>{{ f.etiqueta }}</td>
+            <td class="text-center fw-bold text-warning">{{ f.qty }}</td>
+            <td class="text-center text-muted">{{ f.stock_total }}</td>
+            <td class="text-center fw-bold {{ 'text-danger' if f.agotado else 'text-success' }}">{{ 'Faltan ' ~ (f.libre|abs) if f.agotado else f.libre }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

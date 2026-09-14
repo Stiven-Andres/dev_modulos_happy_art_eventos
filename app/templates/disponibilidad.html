@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Disponibilidad — EventStock{% endblock %}
+{% block content %}
+<a href="/personal" class="btn btn-sm btn-outline-secondary mb-3">← Volver a Personal</a>
+<h4 class="fw-bold">📅 Disponibilidad de {{ persona.nombre }}</h4>
+
+<form method="post" action="/personal/{{ persona.id }}/disponibilidad/agregar" class="d-flex gap-2 my-3" style="max-width:420px;">
+  <input type="date" name="fecha" class="form-control" required>
+  <button class="btn btn-danger">🚫 Marcar no disponible</button>
+</form>
+
+<label class="form-label fw-bold">Fechas marcadas como no disponibles</label>
+{% if not fechas %}
+<div class="text-muted">Disponible en todas las fechas.</div>
+{% else %}
+<div class="d-flex flex-column gap-2" style="max-width:420px;">
+  {% for f in fechas %}
+  <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#fff3f3;">
+    <span>🚫 {{ fmt_date(f ~ 'T12:00:00') }}</span>
+    <form method="post" action="/personal/{{ persona.id }}/disponibilidad/quitar">
+      <input type="hidden" name="fecha" value="{{ f }}">
+      <button class="btn btn-sm btn-outline-danger">✕</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión — EventStock{% endblock %}
+{% block content_noauth %}
+<div class="login-wrap">
+  <div class="card login-card shadow-lg">
+    <div class="card-body p-4">
+      <div class="text-center mb-3">
+        <div class="fs-1">🎪</div>
+        <h5 class="fw-bold">EventStock</h5>
+        <div class="text-muted small">Inventario y gestión de eventos</div>
+      </div>
+      {% if error %}<div class="alert alert-danger py-2 small">{{ error }}</div>{% endif %}
+      <form method="post" action="/login">
+        <div class="mb-3">
+          <label class="form-label">Correo</label>
+          <input type="email" name="email" class="form-control" placeholder="correo@happyarteventos.com" required autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contraseña</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-warning w-100 fw-bold">Entrar al inventario</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

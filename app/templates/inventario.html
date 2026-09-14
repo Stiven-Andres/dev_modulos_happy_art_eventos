@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Inventario — EventStock{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="fw-bold mb-0">Inventario 📦</h3>
+    <div class="text-muted">{{ productos|length }} artículo(s)</div>
+  </div>
+  {% if user.role == 'admin' %}
+  <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalArticulo" onclick="abrirNuevo()">+ Nuevo artículo</button>
+  {% endif %}
+</div>
+
+<form method="get" action="/inventario" class="row g-2 mb-2 align-items-center">
+  <div class="col-md-2">
+    <input type="date" name="fecha" value="{{ fecha }}" class="form-control" onchange="this.form.submit()">
+  </div>
+  <div class="col-md-3">
+    <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre, código, categoría, proveedor...">
+  </div>
+  <div class="col-md-2">
+    <select name="cat" class="form-select" onchange="this.form.submit()">
+      <option value="">Todas las categorías</option>
+      {% for c in categorias %}<option value="{{ c }}" {{ 'selected' if c==cat }}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="evento" class="form-select" onchange="this.form.submit()">
+      <option value="">Todos los tipos</option>
+      <option value="Social" {{ 'selected' if evento=='Social' }}>🎊 Social</option>
+      <option value="Empresarial" {{ 'selected' if evento=='Empresarial' }}>💼 Empresarial</option>
+      <option value="Ambos" {{ 'selected' if evento=='Ambos' }}>✨ Ambos</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="stock" class="form-select" onchange="this.form.submit()">
+      <option value="">Todos los estados</option>
+      <option value="ok" {{ 'selected' if stock=='ok' }}>✅ Disponible</option>
+      <option value="low" {{ 'selected' if stock=='low' }}>⚠️ Stock bajo</option>
+      <option value="out" {{ 'selected' if stock=='out' }}>❌ Agotado</option>
+    </select>
+  </div>
+  <div class="col-md-1"><button class="btn btn-outline-secondary w-100">🔍</button></div>
+</form>
+{% if fecha %}
+<div class="alert alert-info py-2 small d-flex justify-content-between align-items-center">
+  <span>⚠️ Disponibilidad real para el {{ fmt_date(fecha ~ 'T12:00:00') }}</span>
+  <a href="/inventario" class="btn btn-sm btn-outline-secondary">✕ Quitar filtro de fecha</a>
+</div>
+{% if contratos_en_fecha %}
+<div class="card mb-3"><div class="card-body">
+  <h6>📌 Contratos para esta fecha</h6>
+  {% for c in contratos_en_fecha %}
+  <div class="small border-bottom py-1"><strong>{{ c.cliente }}</strong> — {{ c.paquete }}
+    <span class="text-muted">· Asesor: {{ c.asesor or '—' }} · {{ 'Happy Art' if c.empresa=='happy' else 'Conde Eventos' }}</span></div>
+  {% endfor %}
+</div></div>
+{% else %}
+<div class="alert alert-success py-2 small">✅ No hay contratos para esta fecha.</div>
+{% endif %}
+{% endif %}
+
+<div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-3">
+  {% for p in productos %}
+  <div class="col">
+    <div class="card h-100 stat-card shadow-sm">
+      <div class="card-body">
+        <div class="fw-bold">{{ p.nombre }}</div>
+        <div class="small text-muted mb-2">{{ p.sku }} · <span class="badge text-bg-light">{{ p.cat }}</span></div>
+        <div class="fs-4 fw-bold">{{ fmt(p.stock) }} <span class="fs-6 fw-normal text-muted">{{ p.unidad }}</span></div>
+        {% if fecha and p.sep > 0 %}
+        <div class="small text-muted">📌 Separado: <strong>-{{ p.sep }}</strong> · Libre: <strong>{{ p.stock_disp }}</strong></div>
+        {% endif %}
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          {% if p.estado == 'out' %}<span class="badge badge-out">❌ Agotado</span>
+          {% elif p.estado == 'low' %}<span class="badge badge-low">⚠️ Stock bajo</span>
+          {% else %}<span class="badge badge-ok">✅ Disponible</span>{% endif %}
+          <div class="btn-group btn-group-sm">
+            <a href="/movimientos?prod={{ p.id }}" class="btn btn-outline-secondary" title="Movimiento">↕</a>
+            {% if user.role == 'admin' %}
+            <button class="btn btn-outline-secondary" title="Editar" onclick='abrirEditar({{ p|tojson }})' data-bs-toggle="modal" data-bs-target="#modalArticulo">✎</button>
+            <form method="post" action="/inventario/{{ p.id }}/eliminar" onsubmit="return confirm('¿Eliminar este artículo?')" class="d-inline">
+              <button class="btn btn-outline-danger" title="Eliminar">✕</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12 text-center text-muted py-5">🔍 Sin resultados — prueba con otra búsqueda</div>
+  {% endfor %}
+</div>
+
+{% if user.role == 'admin' %}
+<div class="modal fade" id="modalArticulo" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" id="formArticulo" action="/inventario/nuevo">
+        <div class="modal-header"><h5 class="modal-title" id="modalArticuloTitle">📦 Nuevo Artículo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-3">
+          <div class="col-md-6"><label class="form-label">Código / Referencia</label><input class="form-control" name="sku" id="f_sku" required></div>
+          <div class="col-md-6"><label class="form-label">Nombre del artículo</label><input class="form-control" name="nombre" id="f_nombre" required></div>
+          <div class="col-md-6"><label class="form-label">Categoría</label>
+            <select class="form-select" name="cat" id="f_cat" required>
+              <option value="">— Seleccionar —</option>
+              {% for c in todas_categorias %}<option>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Tipo de evento</label>
+            <select class="form-select" name="evento" id="f_evento">
+              <option value="Ambos">✨ Ambos</option><option value="Social">🎊 Social</option><option value="Empresarial">💼 Empresarial</option>
+            </select>
+          </div>
+          <div class="col-md-4"><label class="form-label">Stock inicial</label><input type="number" min="0" class="form-control" name="stock" id="f_stock"></div>
+          <div class="col-md-4"><label class="form-label">Stock mínimo</label><input type="number" min="0" class="form-control" name="min" id="f_min"></div>
+          <div class="col-md-4"><label class="form-label">Unidad de medida</label>
+            <select class="form-select" name="unidad" id="f_unidad">{% for u in unidades %}<option>{{ u }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-4"><label class="form-label">Costo unitario ($)</label><input type="number" min="0" step="0.01" class="form-control" name="precio" id="f_precio"></div>
+          <div class="col-md-4"><label class="form-label">Proveedor</label><input class="form-control" name="proveedor" id="f_proveedor"></div>
+          <div class="col-md-4"><label class="form-label">Ubicación en bodega</label><input class="form-control" name="ubicacion" id="f_ubicacion"></div>
+          <div class="col-12"><label class="form-label">Descripción / Observaciones</label><textarea class="form-control" name="desc" id="f_desc"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning fw-bold">💾 Guardar artículo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function abrirNuevo(){
+  document.getElementById('modalArticuloTitle').textContent='📦 Nuevo Artículo';
+  document.getElementById('formArticulo').action='/inventario/nuevo';
+  document.getElementById('formArticulo').reset();
+}
+function abrirEditar(p){
+  document.getElementById('modalArticuloTitle').textContent='📦 Editar Artículo';
+  document.getElementById('formArticulo').action='/inventario/'+p.id+'/editar';
+  document.getElementById('f_sku').value=p.sku;
+  document.getElementById('f_nombre').value=p.nombre;
+  document.getElementById('f_cat').value=p.cat;
+  document.getElementById('f_evento').value=p.evento;
+  document.getElementById('f_stock').value=p.stock;
+  document.getElementById('f_min').value=p.min;
+  document.getElementById('f_unidad').value=p.unidad;
+  document.getElementById('f_precio').value=p.precio;
+  document.getElementById('f_proveedor').value=p.proveedor||'';
+  document.getElementById('f_ubicacion').value=p.ubicacion||'';
+  document.getElementById('f_desc').value=p.desc||'';
+}
+</script>
+{% endif %}
+{% endblock %}

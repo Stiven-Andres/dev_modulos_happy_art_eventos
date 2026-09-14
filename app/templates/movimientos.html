@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Movimientos — EventStock{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h3 class="fw-bold mb-0">Movimientos ↕️</h3>
+    <div class="text-muted">Historial de entradas, salidas y ajustes</div>
+  </div>
+  <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalMov">+ Registrar movimiento</button>
+</div>
+
+<div class="list-group">
+  {% for m in movimientos %}
+  <div class="list-group-item d-flex align-items-center gap-3">
+    <span class="badge {{ {'entrada':'text-bg-success','salida':'text-bg-danger','ajuste':'text-bg-secondary','prestamo':'text-bg-info','devolucion':'text-bg-primary'}.get(m.tipo, 'text-bg-secondary') }}">{{ m.tipo|upper }}</span>
+    <div class="flex-grow-1">
+      <div class="fw-bold">{{ m.prod_nombre }}</div>
+      <div class="small text-muted">{{ fmt_fecha(m.fecha) }}{% if m.evento %} · 🎪 {{ m.evento }}{% endif %}{% if m.nota %} · {{ m.nota }}{% endif %}</div>
+    </div>
+    <div class="fw-bold {{ 'text-success' if m.qty > 0 else 'text-danger' }}">{{ '+' if m.qty > 0 }}{{ m.qty }}</div>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">Sin movimientos registrados</div>
+  {% endfor %}
+</div>
+
+<div class="modal fade" id="modalMov" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/movimientos/nuevo">
+        <div class="modal-header"><h5 class="modal-title">↕️ Registrar Movimiento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-3">
+          <div class="col-12"><label class="form-label">Artículo</label>
+            <select class="form-select" name="prodId" required>
+              <option value="">— Seleccionar artículo —</option>
+              {% for p in productos %}<option value="{{ p.id }}" {{ 'selected' if p.id==prod_preseleccionado }}>{{ p.nombre }} · Stock: {{ p.stock }} {{ p.unidad }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Tipo de movimiento</label>
+            <select class="form-select" name="tipo">
+              <option value="entrada">📥 Entrada — compra / recepción</option>
+              <option value="salida">📤 Salida — uso / despacho</option>
+              <option value="ajuste">🔧 Ajuste de inventario</option>
+            </select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Cantidad</label><input type="number" min="1" class="form-control" name="qty" required></div>
+          <div class="col-md-6"><label class="form-label">Evento / Cliente</label><input class="form-control" name="evento" placeholder="Ej: Boda García..."></div>
+          <div class="col-12"><label class="form-label">Nota u observación</label><input class="form-control" name="nota" placeholder="Proveedor, número de orden, motivo..."></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning fw-bold">Registrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% if prod_preseleccionado %}
+<script>new bootstrap.Modal(document.getElementById('modalMov')).show();</script>
+{% endif %}
+{% endblock %}

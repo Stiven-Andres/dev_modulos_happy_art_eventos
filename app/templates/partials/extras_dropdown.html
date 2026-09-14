@@ -1,0 +1,14 @@
+<div class="list-group position-absolute w-100 shadow" style="z-index:20;max-height:260px;overflow-y:auto;">
+  {% for p in resultados %}
+  {% set s = stock_status(p) %}
+  <form method="post" action="{{ add_action }}" class="list-group-item list-group-item-action p-0">
+    <input type="hidden" name="prodId" value="{{ p.id }}">
+    <button type="submit" class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center py-2">
+      <span><span class="fw-bold">{{ p.nombre }}</span> <span class="small text-muted">{{ p.cat }} · {{ p.sku }}</span></span>
+      <span class="badge {{ 'text-bg-danger' if s=='out' else ('text-bg-warning' if s=='low' else 'text-bg-success') }}">{{ p.stock }} {{ p.unidad }}</span>
+    </button>
+  </form>
+  {% else %}
+  {% if q %}<div class="list-group-item text-muted small">Sin resultados</div>{% endif %}
+  {% endfor %}
+</div>
