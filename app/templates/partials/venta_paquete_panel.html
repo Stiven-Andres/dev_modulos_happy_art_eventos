@@ -1,0 +1,54 @@
+<input type="hidden" name="currentPkId" value="{{ pk.id if pk else '' }}">
+{% if pk %}
+<div class="venta-section fw-bold mt-3">🎉 {{ pk.nombreHappy if empresa=='happy' else pk.nombreConde }}</div>
+
+<div class="mb-2" style="max-width:260px;">
+  <label class="form-label">💰 Valor del paquete</label>
+  <input type="text" class="form-control" name="valorPaquete" value="{{ valor_paquete }}" inputmode="numeric">
+  <div class="form-text">Catálogo: {{ fmt_precio(valor_paquete_raw) if valor_paquete_raw else '' }}</div>
+</div>
+
+{% if mensajes or faltantes %}
+<div class="alert alert-info py-2 small">
+  {% for m in mensajes %}{{ m }}<br>{% endfor %}
+  {% for f in faltantes %}⚠️ {{ f }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<div class="small fw-bold text-uppercase text-muted mt-2">✅ Incluido en el paquete</div>
+<ul class="small">
+  {% for i in incluidos %}
+  <li>{{ i.texto }}
+    {% if i.estado == 'sin_stock' %}<span class="text-danger fw-bold">⚠️ sin stock esa fecha</span>
+    {% elif i.estado == 'bajo' %}<span class="text-warning fw-bold">⚠️ stock bajo</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+
+{% if pendientes_variante %}
+<div class="small fw-bold text-uppercase text-muted mt-3">🎭 Especifica cuál necesita el cliente</div>
+{% for p in pendientes_variante %}
+{% set key = p.itemNombre ~ '::' ~ p.termino ~ '::' ~ p.idx %}
+{% set etiqueta = (p.itemNombre ~ ' #' ~ (p.idx+1)) if (p.opciones|length > 1 and pendientes_variante|selectattr('itemNombre','equalto',p.itemNombre)|selectattr('termino','equalto',p.termino)|list|length > 1) else p.itemNombre %}
+<div class="mb-2">
+  <label class="form-label small">{{ etiqueta }} {% if p.obligatorio %}<span class="text-danger fw-bold">*</span>{% else %}<span class="text-muted">(opcional)</span>{% endif %}</label>
+  <select class="form-select form-select-sm" name="variante__{{ key }}">
+    <option value="">— Selecciona —</option>
+    {% for o in p.opciones %}<option value="{{ o.id }}">{{ o.sku or o.nombre }}{% if o.stock <= 0 %} (sin stock){% endif %}</option>{% endfor %}
+  </select>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="venta-section fw-bold mt-3">➕ Artículos adicionales <span class="fw-normal small">(opcional — busca y agrega)</span></div>
+<div class="position-relative mb-2" style="max-width:420px;">
+  <input type="text" class="form-control" placeholder="Buscar por nombre, código o categoría..." name="q"
+    hx-get="/ventas/extras/buscar" hx-include="[name='currentPkId'],[name='empresa']" hx-trigger="keyup changed delay:300ms" hx-target="#extras-dropdown">
+  <div id="extras-dropdown"></div>
+</div>
+<div id="extras-panel">
+  {% include "partials/venta_extras_chips.html" %}
+</div>
+{% else %}
+<div class="text-muted small mt-3">Selecciona un paquete arriba para continuar.</div>
+{% endif %}

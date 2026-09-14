@@ -23,7 +23,7 @@
       <button type="submit" class="paquete-card w-100 h-100 text-start p-2 bg-white">
         <div class="fw-bold small">{{ p.nombreHappy }}</div>
         <div class="text-muted" style="font-size:10px;">{{ p.nombreConde }}</div>
-        <div class="text-muted small mt-1">{{ p.items|length }} ítems</div>
+        <div class="text-muted small mt-1">{{ p['items']|length }} ítems</div>
       </button>
     </form>
   </div>

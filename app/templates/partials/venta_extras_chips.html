@@ -1,0 +1,10 @@
+{% for e in extras if e.prod %}
+<input type="hidden" name="extra_prodId" value="{{ e.prod.id }}">
+<div class="d-flex align-items-center gap-2 mb-1">
+  <span class="flex-grow-1">{{ e.prod.nombre }} <span class="text-muted small">(disp: {{ e.prod.stock }})</span></span>
+  <input type="number" min="1" max="{{ e.prod.stock }}" value="{{ e.qty }}" name="extra_qty" class="form-control form-control-sm" style="width:64px;"
+    hx-post="{{ sync_action or '/ventas/extras/sync' }}" hx-include="closest form" hx-target="#extras-panel" hx-trigger="change">
+  <button type="button" class="btn btn-sm btn-outline-danger"
+    hx-post="{{ quitar_action or '/ventas/extras/quitar' }}" hx-include="closest form" hx-vals='{"removeProdId": {{ e.prod.id }}}' hx-target="#extras-panel">✕</button>
+</div>
+{% endfor %}

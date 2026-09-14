@@ -4,7 +4,7 @@ loanSelectPkg()/confirmarPrestamoPaquete() en legacy/js/main.js."""
 from fastapi import APIRouter, Depends, Form, Request
 
 from app import firebase
-from app.deps import redirect_to, require_login, templates
+from app.deps import redirect_to, require_admin_o_bodega, templates
 from app.models import PAQUETES
 from app.services import productos as svc
 from app.services import prestamo_wizard as wizard
@@ -44,7 +44,7 @@ def _agrupar_prestamos(state):
 
 
 @router.get("/prestamos")
-def ver_prestamos(request: Request, user=Depends(require_login)):
+def ver_prestamos(request: Request, user=Depends(require_admin_o_bodega)):
     state = firebase.get_state()
     grupos = _agrupar_prestamos(state)
     return templates.TemplateResponse(request, "prestamos.html", {
@@ -53,7 +53,7 @@ def ver_prestamos(request: Request, user=Depends(require_login)):
 
 
 @router.post("/prestamos/nuevo")
-def crear_simple(request: Request, user=Depends(require_login),
+def crear_simple(request: Request, user=Depends(require_admin_o_bodega),
                   prodId: str = Form(...), qty: str = Form(...), cliente: str = Form(...),
                   retorno: str = Form(""), nota: str = Form("")):
     state = firebase.get_state()
@@ -67,7 +67,7 @@ def crear_simple(request: Request, user=Depends(require_login),
 
 
 @router.post("/prestamos/{id}/devolver")
-def devolver(id: int, request: Request, user=Depends(require_login)):
+def devolver(id: int, request: Request, user=Depends(require_admin_o_bodega)):
     state = firebase.get_state()
     svc.devolver_prestamo(state, id)
     firebase.save_state(state)
@@ -78,7 +78,7 @@ def devolver(id: int, request: Request, user=Depends(require_login)):
 # ── Wizard de préstamo por paquete ──────────────────────────────────────────
 
 @router.get("/prestamos/wizard")
-def wizard_paso1(request: Request, user=Depends(require_login)):
+def wizard_paso1(request: Request, user=Depends(require_admin_o_bodega)):
     request.session.pop("prestamo_draft", None)
     paquetes_por_cat = {c["id"]: [p for p in PAQUETES if p["categoria"] == c["id"]] for c in wizard.CATEGORIAS_PAQUETE}
     return templates.TemplateResponse(request, "prestamo_wizard.html", {
@@ -88,7 +88,7 @@ def wizard_paso1(request: Request, user=Depends(require_login)):
 
 
 @router.post("/prestamos/wizard/seleccionar")
-def wizard_seleccionar(request: Request, user=Depends(require_login), pkId: str = Form(...)):
+def wizard_seleccionar(request: Request, user=Depends(require_admin_o_bodega), pkId: str = Form(...)):
     state = firebase.get_state()
     try:
         draft = wizard.iniciar_draft(state, pkId)
@@ -105,7 +105,7 @@ def _get_draft(request):
 
 
 @router.get("/prestamos/wizard/paso2")
-def wizard_paso2(request: Request, user=Depends(require_login)):
+def wizard_paso2(request: Request, user=Depends(require_admin_o_bodega)):
     draft = _get_draft(request)
     if not draft:
         return redirect_to("/prestamos/wizard")
@@ -128,7 +128,7 @@ def wizard_paso2(request: Request, user=Depends(require_login)):
 
 
 @router.post("/prestamos/wizard/paso2/qty")
-def wizard_set_qty(request: Request, user=Depends(require_login), idx: int = Form(...), qty: int = Form(...)):
+def wizard_set_qty(request: Request, user=Depends(require_admin_o_bodega), idx: int = Form(...), qty: int = Form(...)):
     draft = _get_draft(request)
     if draft and 0 <= idx < len(draft["returnItems"]):
         draft["returnItems"][idx]["qty"] = max(0, qty)
@@ -137,7 +137,7 @@ def wizard_set_qty(request: Request, user=Depends(require_login), idx: int = For
 
 
 @router.post("/prestamos/wizard/paso2/variante")
-def wizard_set_variante(request: Request, user=Depends(require_login),
+def wizard_set_variante(request: Request, user=Depends(require_admin_o_bodega),
                          idx: int = Form(...), linea: int = Form(...),
                          prodId: str = Form(""), qty: int = Form(1)):
     draft = _get_draft(request)
@@ -151,7 +151,7 @@ def wizard_set_variante(request: Request, user=Depends(require_login),
 
 
 @router.post("/prestamos/wizard/paso2/agregar-linea")
-def wizard_agregar_linea(request: Request, user=Depends(require_login), idx: int = Form(...)):
+def wizard_agregar_linea(request: Request, user=Depends(require_admin_o_bodega), idx: int = Form(...)):
     draft = _get_draft(request)
     if draft and 0 <= idx < len(draft["returnItems"]):
         draft["returnItems"][idx]["seleccionesVariante"].append({"prodId": None, "qty": 1})
@@ -160,7 +160,7 @@ def wizard_agregar_linea(request: Request, user=Depends(require_login), idx: int
 
 
 @router.post("/prestamos/wizard/paso2/quitar-linea")
-def wizard_quitar_linea(request: Request, user=Depends(require_login), idx: int = Form(...), linea: int = Form(...)):
+def wizard_quitar_linea(request: Request, user=Depends(require_admin_o_bodega), idx: int = Form(...), linea: int = Form(...)):
     draft = _get_draft(request)
     if draft and 0 <= idx < len(draft["returnItems"]):
         lineas = draft["returnItems"][idx]["seleccionesVariante"]
@@ -171,7 +171,7 @@ def wizard_quitar_linea(request: Request, user=Depends(require_login), idx: int 
 
 
 @router.get("/prestamos/wizard/extras/buscar")
-def wizard_extras_buscar(request: Request, user=Depends(require_login), q: str = ""):
+def wizard_extras_buscar(request: Request, user=Depends(require_admin_o_bodega), q: str = ""):
     draft = _get_draft(request)
     if not draft:
         return redirect_to("/prestamos/wizard")
@@ -194,7 +194,7 @@ def wizard_extras_buscar(request: Request, user=Depends(require_login), q: str =
 
 
 @router.post("/prestamos/wizard/extras/agregar")
-def wizard_extras_agregar(request: Request, user=Depends(require_login), prodId: int = Form(...)):
+def wizard_extras_agregar(request: Request, user=Depends(require_admin_o_bodega), prodId: int = Form(...)):
     draft = _get_draft(request)
     if draft and not any(e["prodId"] == prodId for e in draft["extras"]):
         draft["extras"].append({"prodId": prodId, "qty": 1})
@@ -203,7 +203,7 @@ def wizard_extras_agregar(request: Request, user=Depends(require_login), prodId:
 
 
 @router.post("/prestamos/wizard/extras/quitar")
-def wizard_extras_quitar(request: Request, user=Depends(require_login), prodId: int = Form(...)):
+def wizard_extras_quitar(request: Request, user=Depends(require_admin_o_bodega), prodId: int = Form(...)):
     draft = _get_draft(request)
     if draft:
         draft["extras"] = [e for e in draft["extras"] if e["prodId"] != prodId]
@@ -212,7 +212,7 @@ def wizard_extras_quitar(request: Request, user=Depends(require_login), prodId: 
 
 
 @router.post("/prestamos/wizard/extras/qty")
-def wizard_extras_qty(request: Request, user=Depends(require_login), prodId: int = Form(...), qty: int = Form(1)):
+def wizard_extras_qty(request: Request, user=Depends(require_admin_o_bodega), prodId: int = Form(...), qty: int = Form(1)):
     draft = _get_draft(request)
     if draft:
         for e in draft["extras"]:
@@ -223,7 +223,7 @@ def wizard_extras_qty(request: Request, user=Depends(require_login), prodId: int
 
 
 @router.get("/prestamos/wizard/paso3")
-def wizard_paso3(request: Request, user=Depends(require_login)):
+def wizard_paso3(request: Request, user=Depends(require_admin_o_bodega)):
     draft = _get_draft(request)
     if not draft:
         return redirect_to("/prestamos/wizard")
@@ -236,7 +236,7 @@ def wizard_paso3(request: Request, user=Depends(require_login)):
 
 
 @router.post("/prestamos/wizard/confirmar")
-def wizard_confirmar(request: Request, user=Depends(require_login),
+def wizard_confirmar(request: Request, user=Depends(require_admin_o_bodega),
                       coordinador: str = Form(""), cliente: str = Form(""), fecha_evento: str = Form(""),
                       retorno: str = Form(""), nota: str = Form("")):
     draft = _get_draft(request)

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Nueva Venta — EventStock{% endblock %}
+{% block content %}
+{% if not empresa %}
+<h3 class="fw-bold mb-3">Nueva Venta 🛒</h3>
+<div class="row g-3" style="max-width:640px;">
+  <div class="col-md-6">
+    <a href="/ventas?empresa=happy" class="btn btn-warning w-100 py-4 fw-bold fs-5">🎪 Happy Art Eventos</a>
+  </div>
+  <div class="col-md-6">
+    <a href="/ventas?empresa=conde" class="btn w-100 py-4 fw-bold fs-5 text-white" style="background:#6f42c1;">🎭 Conde Eventos</a>
+  </div>
+</div>
+{% else %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="fw-bold fs-4">{{ '🎪 Happy Art Eventos' if empresa=='happy' else '🎭 Conde Eventos' }}</div>
+  <a href="/ventas" class="btn btn-sm btn-outline-secondary">Cambiar empresa</a>
+</div>
+
+<form method="post" action="/ventas/registrar" id="ventaForm">
+<input type="hidden" name="empresa" value="{{ empresa }}">
+
+<div class="row g-3">
+  <div class="col-md-4"><label class="form-label">Fecha del evento</label>
+    <input type="date" name="fecha" class="form-control" value="{{ fecha }}"
+      hx-post="/ventas/paquete" hx-include="closest form" hx-target="#paquete-panel" hx-trigger="change"></div>
+  <div class="col-md-4"><label class="form-label">Hora de decoración <span class="small text-muted">(opcional)</span></label><input type="time" name="horaDecoracion" class="form-control"></div>
+  <div class="col-md-4"><label class="form-label">Hora de inicio del evento</label><input type="time" name="hora" class="form-control"></div>
+  <div class="col-12"><label class="form-label">Nombre completo del cliente</label><input type="text" name="cliente" class="form-control" required></div>
+  <div class="col-md-6"><label class="form-label">Teléfono 1</label><input type="tel" name="tel1" maxlength="10" class="form-control" required></div>
+  <div class="col-md-6"><label class="form-label">Teléfono 2</label><input type="tel" name="tel2" maxlength="10" class="form-control"></div>
+  <div class="col-12"><label class="form-label">Dirección de la celebración</label><input type="text" name="direccion" class="form-control"></div>
+  <div class="col-md-6"><label class="form-label">Barrio</label><input type="text" name="barrio" class="form-control"></div>
+  <div class="col-md-6"><label class="form-label">Localidad</label><input type="text" name="localidad" class="form-control"></div>
+  <div class="col-md-6"><label class="form-label">Nombre del festejado</label>
+    <input type="text" name="festejado" class="form-control" value="{{ festejado }}"
+      hx-post="/ventas/detectar" hx-include="closest form" hx-target="#paquete-panel" hx-trigger="change"></div>
+  <div class="col-md-6"><label class="form-label">Número de años a cumplir <span class="small text-muted">(solo si aplica)</span></label>
+    <input type="text" name="anios" class="form-control" value="{{ anios }}"
+      hx-post="/ventas/detectar" hx-include="closest form" hx-target="#paquete-panel" hx-trigger="change"></div>
+</div>
+
+<div class="mt-4">
+  <div class="fw-bold mb-2">Elige un paquete</div>
+  {% for c in categorias %}
+  {% set pkgs = paquetes_por_cat[c.id] %}
+  {% if pkgs %}
+  <div class="small fw-bold text-muted text-uppercase mt-3 mb-2">{{ c.label }}</div>
+  <div class="row row-cols-2 row-cols-md-4 g-2">
+    {% for p in pkgs %}
+    <div class="col">
+      <button type="button" class="paquete-card w-100 h-100 text-start p-2 bg-white"
+        hx-post="/ventas/paquete" hx-include="closest form" hx-vals='{"pkId": "{{ p.id }}"}' hx-target="#paquete-panel">
+        <div class="fw-bold small">{{ p.nombreHappy if empresa=='happy' else p.nombreConde }}</div>
+        <div class="text-muted" style="font-size:10px;">{{ p.nombreConde if empresa=='happy' else p.nombreHappy }}</div>
+        <div class="fw-bold small mt-1" style="color:{{ '#ff6b35' if empresa=='happy' else '#6f42c1' }};">{{ fmt_precio(p.precio) }}</div>
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div id="paquete-panel">
+  {% include "partials/venta_paquete_panel.html" %}
+</div>
+
+<div class="mt-4">
+  <div class="fw-bold mb-2">👥 Personal necesario para el evento</div>
+  <div class="row g-3">
+    <div class="col-md-3"><label class="form-label">🚚 Logísticos</label><input type="number" min="0" name="pers_logistico" value="0" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🎭 Recreadores</label><input type="number" min="0" name="pers_recreador" value="0" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🧭 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="0" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🔧 Operarios</label><input type="number" min="0" name="pers_operario" value="0" class="form-control"></div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-end mt-4 pt-3 border-top">
+  <button type="submit" class="btn btn-warning fw-bold fs-6 px-4 py-2">📄 Registrar y Generar Contrato</button>
+</div>
+</form>
+{% endif %}
+{% endblock %}

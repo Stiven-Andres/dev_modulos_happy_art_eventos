@@ -3,14 +3,14 @@ nuevos movimientos. Portado de renderMovimientos()/guardarMovimiento()."""
 from fastapi import APIRouter, Depends, Form, Request
 
 from app import firebase, models
-from app.deps import redirect_to, require_login, templates
+from app.deps import redirect_to, require_admin_o_bodega, templates
 from app.services import productos as svc
 
 router = APIRouter()
 
 
 @router.get("/movimientos")
-def ver_movimientos(request: Request, user=Depends(require_login), prod: int = 0):
+def ver_movimientos(request: Request, user=Depends(require_admin_o_bodega), prod: int = 0):
     state = firebase.get_state()
     lista = sorted(state["movimientos"], key=lambda m: m["fecha"], reverse=True)
     for m in lista:
@@ -23,7 +23,7 @@ def ver_movimientos(request: Request, user=Depends(require_login), prod: int = 0
 
 
 @router.post("/movimientos/nuevo")
-def crear(request: Request, user=Depends(require_login),
+def crear(request: Request, user=Depends(require_admin_o_bodega),
           prodId: str = Form(...), tipo: str = Form(...), qty: str = Form(...),
           evento: str = Form(""), nota: str = Form("")):
     state = firebase.get_state()

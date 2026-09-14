@@ -3,13 +3,13 @@ renderAlertas()."""
 from fastapi import APIRouter, Depends, Request
 
 from app import firebase, models
-from app.deps import require_login, templates
+from app.deps import require_admin_o_bodega, templates
 
 router = APIRouter()
 
 
 @router.get("/alertas")
-def ver_alertas(request: Request, user=Depends(require_login)):
+def ver_alertas(request: Request, user=Depends(require_admin_o_bodega)):
     state = firebase.get_state()
     lista = sorted(
         (p for p in state["productos"] if models.stock_status(p) != "ok"),

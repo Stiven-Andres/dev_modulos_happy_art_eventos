@@ -5,7 +5,7 @@ eliminarProducto() de legacy/js/main.js."""
 from fastapi import APIRouter, Depends, Form, Request
 
 from app import firebase, models
-from app.deps import redirect_to, require_login, templates
+from app.deps import redirect_to, require_admin_o_bodega, templates
 from app.services import productos as svc
 from app.services.calculos import calc_stock_separado_por_fecha
 
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/inventario")
 def ver_inventario(
-    request: Request, user=Depends(require_login),
+    request: Request, user=Depends(require_admin_o_bodega),
     q: str = "", cat: str = "", evento: str = "", stock: str = "", fecha: str = "",
 ):
     state = firebase.get_state()
@@ -48,7 +48,7 @@ def ver_inventario(
 
 
 @router.post("/inventario/nuevo")
-def crear(request: Request, user=Depends(require_login),
+def crear(request: Request, user=Depends(require_admin_o_bodega),
           sku: str = Form(...), nombre: str = Form(...), cat: str = Form(...),
           evento: str = Form("Ambos"), precio: str = Form("0"), stock: str = Form("0"),
           min: str = Form("0"), unidad: str = Form("Unidad"), proveedor: str = Form(""),
@@ -69,7 +69,7 @@ def crear(request: Request, user=Depends(require_login),
 
 
 @router.post("/inventario/{id}/editar")
-def editar(id: int, request: Request, user=Depends(require_login),
+def editar(id: int, request: Request, user=Depends(require_admin_o_bodega),
            sku: str = Form(...), nombre: str = Form(...), cat: str = Form(...),
            evento: str = Form("Ambos"), precio: str = Form("0"), stock: str = Form("0"),
            min: str = Form("0"), unidad: str = Form("Unidad"), proveedor: str = Form(""),
@@ -90,7 +90,7 @@ def editar(id: int, request: Request, user=Depends(require_login),
 
 
 @router.post("/inventario/{id}/eliminar")
-def eliminar(id: int, request: Request, user=Depends(require_login)):
+def eliminar(id: int, request: Request, user=Depends(require_admin_o_bodega)):
     if user["role"] != "admin":
         request.session["flash"] = {"type": "danger", "text": "No tienes permisos para esta acción"}
         return redirect_to("/inventario")

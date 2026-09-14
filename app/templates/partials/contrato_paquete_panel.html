@@ -1,0 +1,15 @@
+<input type="hidden" name="pkId" value="{{ pk.id if pk else '' }}">
+{% if pendientes_variante %}
+<div class="small fw-bold text-uppercase text-muted mt-3">🎭 Especifica cuál necesita el cliente</div>
+{% for p in pendientes_variante %}
+{% set key = p.itemNombre ~ '::' ~ p.termino ~ '::' ~ p.idx %}
+{% set etiqueta = (p.itemNombre ~ ' #' ~ (p.idx+1)) if (p.opciones|length > 1 and pendientes_variante|selectattr('itemNombre','equalto',p.itemNombre)|selectattr('termino','equalto',p.termino)|list|length > 1) else p.itemNombre %}
+<div class="mb-2">
+  <label class="form-label small">{{ etiqueta }} {% if p.obligatorio %}<span class="text-danger fw-bold">*</span>{% else %}<span class="text-muted">(opcional)</span>{% endif %}</label>
+  <select class="form-select form-select-sm" name="variante__{{ key }}">
+    <option value="">— Selecciona —</option>
+    {% for o in p.opciones %}<option value="{{ o.id }}" {{ 'selected' if variantes_sel.get(key)==o.id }}>{{ o.sku or o.nombre }}{% if o.stock <= 0 %} (sin stock){% endif %}</option>{% endfor %}
+  </select>
+</div>
+{% endfor %}
+{% endif %}

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CONTRATO {{ dia_nombre }} DE {{ mes_nombre }} {{ nombre_cliente }}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  @page{size:letter;margin:14mm 16mm 14mm 16mm;}
+  body{font-family:Arial,sans-serif;font-size:10.5pt;color:#222;line-height:1.5;background:#fff;}
+
+  .header{text-align:center;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid {{ color_empresa }};}
+  .header img{max-height:65px;width:auto;display:block;margin:0 auto 4px;}
+  .header .nit{font-size:9.5pt;color:#555;font-weight:700;margin-top:4px;}
+
+  .titulo{font-size:12.5pt;font-weight:900;text-align:center;background:{{ color_empresa }};color:#fff;
+           padding:7px 12px;border-radius:6px;margin:12px 0 0;letter-spacing:0.5px;text-transform:uppercase;}
+
+  .info-header{background:{{ color_empresa }};color:#fff;font-weight:800;font-size:9.5pt;
+                text-align:center;padding:5px 10px;margin-bottom:0;}
+  table.info-table{width:100%;border-collapse:collapse;margin-bottom:12px;margin-top:0;}
+  table.info-table td{padding:5px 10px;border:1px solid #ccc;font-size:10pt;vertical-align:middle;}
+  table.info-table tr td:first-child{font-weight:800;width:40%;background:#f5f5f5;color:#444;font-size:9.5pt;text-transform:uppercase;}
+  table.info-table tr:last-child td{border-bottom:1px solid #ccc;}
+
+  .cond-box{border:1.5px solid {{ color_empresa }};border-radius:6px;padding:9px 13px;margin:10px 0;
+             font-size:8.8pt;background:#fafafa;line-height:1.55;}
+  .cond-title{font-weight:900;color:{{ color_empresa }};margin-bottom:6px;font-size:9.5pt;display:block;}
+  .nota-box{border:1.5px solid #d4ac00;background:#fffce6;border-radius:6px;
+             padding:7px 12px;margin:8px 0;font-size:8.8pt;}
+
+  .firmas{display:flex;justify-content:space-around;align-items:flex-end;
+           margin:24px 0 14px;text-align:center;}
+  .firma-bloque{text-align:center;}
+  .firma-linea{border-top:1.5px solid #333;width:200px;margin:0 auto;padding-top:6px;
+                font-size:9pt;color:#444;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+
+  .medios{text-align:center;margin-top:10px;padding:8px 12px;background:#f3f3f3;
+           border-radius:6px;font-size:9pt;color:#333;}
+  .medios b{color:{{ color_empresa }};}
+
+  .page-break{page-break-before:always;padding-top:14px;}
+
+  table{width:100%;border-collapse:collapse;}
+  img{max-width:100%;display:block;}
+
+  .pk-intro{font-size:9.5pt;color:#555;margin:8px 0 12px;}
+  .paquete-items{list-style:none;padding:0;margin:0;}
+  .paquete-items li{display:flex;align-items:flex-start;gap:9px;padding:5px 8px;
+                     border-bottom:1px solid #eee;font-size:9.8pt;}
+  .paquete-items li:last-child{border-bottom:none;}
+  .paquete-items li:nth-child(even){background:#f9f9f9;}
+  .chk{color:#22a55a;font-size:13pt;line-height:1.1;flex-shrink:0;font-weight:900;}
+
+  .enc-intro{font-size:9pt;color:#555;margin:8px 0 10px;}
+  table.enc-table{width:100%;border-collapse:collapse;border:1.5px solid #ddd;border-radius:6px;}
+  .enc-table thead tr{background:{{ color_empresa }};}
+  .enc-table thead td{color:#fff;font-weight:800;font-size:9pt;padding:7px 12px;}
+  .enc-table tbody tr:nth-child(even){background:#f7f7f7;}
+  .enc-table tbody td{padding:6px 12px;border-bottom:1px solid #eee;font-size:9.3pt;vertical-align:middle;}
+  .enc-table tbody tr:last-child td{border-bottom:none;}
+  .enc-nums{display:flex;gap:5px;justify-content:flex-end;flex-shrink:0;}
+  .enc-num{width:24px;height:24px;border:1.5px solid #bbb;border-radius:4px;display:inline-flex;
+            align-items:center;justify-content:center;font-size:8.5pt;font-weight:800;color:#666;}
+  .enc-open-line{border-bottom:1.5px solid #aaa;margin-top:20px;width:100%;}
+  .enc-asesor{font-size:9pt;padding-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- PÁGINA 1: CONTRATO -->
+{% include "pdf/_header.html" %}
+<div class="titulo">{{ titulo_pagina1 }}</div>
+<div class="info-header">INFORMACIÓN DEL CLIENTE</div>
+<table class="info-table">
+  <tr><td>Fecha del Evento</td><td>{{ fmt_fecha_contrato(c.fecha) }}</td></tr>
+  <tr><td>Hora del Evento</td><td>{{ fmt_hora_evento(c) }}</td></tr>
+  <tr><td>Cliente</td><td><strong>{{ c.cliente|upper }}</strong></td></tr>
+  <tr><td>Festejado</td><td><strong>{{ (c.festejado or '—')|upper }}</strong></td></tr>
+  <tr><td>Teléfono</td><td>{{ telefonos }}</td></tr>
+  <tr><td>Dirección</td><td>{{ c.direccion }}</td></tr>
+  <tr><td>Barrio</td><td>{{ c.barrio }}</td></tr>
+  <tr><td>Localidad</td><td>{{ c.localidad }}</td></tr>
+  <tr><td>Tipo de Paquete</td><td><strong>{{ c.paquete }}</strong></td></tr>
+  <tr><td>Valor del Paquete</td><td><strong style="color:{{ color_empresa }};font-size:12pt;">{{ fmt_precio(c.valor) }}</strong>
+    {% if c.valorCatalogo and c.valorCatalogo != c.valor %}<span style="font-size:9pt;color:#888;">(precio de catálogo: {{ fmt_precio(c.valorCatalogo) }})</span>{% endif %}</td></tr>
+  <tr><td>Asesor</td><td>{{ c.asesor or '—' }}</td></tr>
+</table>
+
+<div class="cond-box">
+  <span class="cond-title">📌 Condiciones del Servicio</span>
+  {{ condiciones }}
+</div>
+<div class="nota-box"><strong>📌 Nota:</strong> {{ nota }}</div>
+
+<div class="firmas">
+  <div class="firma-bloque"><div class="firma-linea">Firma Coordinador</div></div>
+  <div class="firma-bloque"><div class="firma-linea">Firma Cliente</div></div>
+</div>
+<div class="medios"><b>Medios de pago:</b> {{ medios_pago|safe }}</div>
+
+<!-- PÁGINA 2: CONTENIDO DEL PAQUETE -->
+<div class="page-break">
+  {% include "pdf/_header.html" %}
+  <div class="titulo">Contenido del Paquete: {{ c.paquete }}</div>
+  <p class="pk-intro">Para mayor seguridad de su paquete contratado y que todo salga bien, le informamos el contenido del paquete seleccionado:</p>
+  <ul class="paquete-items">
+    {% for i in c['items'] %}<li><span class="chk">✔</span><span>{{ i }}</span></li>{% endfor %}
+  </ul>
+</div>
+
+<!-- PÁGINA 3: ENCUESTA -->
+<div class="page-break">
+  {% include "pdf/_header.html" %}
+  <div class="titulo">Encuesta de Satisfacción</div>
+  <p class="enc-intro">Al finalizar el evento, te invitamos a calificar tu experiencia de <strong>1 a 5</strong>, siendo 1 la puntuación más baja y 5 la más alta. ¡Tu opinión es muy importante para nosotros!</p>
+  <table class="enc-table">
+    <thead><tr>
+      <td style="width:65%;">Pregunta</td>
+      <td style="text-align:right;width:35%;">Calificación</td>
+    </tr></thead>
+    <tbody>
+      <tr><td>¿Qué tan probable es que recomiende nuestros servicios?</td><td><div class="enc-nums"><span class="enc-num">1</span><span class="enc-num">2</span><span class="enc-num">3</span><span class="enc-num">4</span><span class="enc-num">5</span></div></td></tr>
+      <tr><td>¿Qué tan satisfecho se siente con el servicio?</td><td><div class="enc-nums"><span class="enc-num">1</span><span class="enc-num">2</span><span class="enc-num">3</span><span class="enc-num">4</span><span class="enc-num">5</span></div></td></tr>
+      <tr><td>¿Cómo califica el desempeño del coordinador?</td><td><div class="enc-nums"><span class="enc-num">1</span><span class="enc-num">2</span><span class="enc-num">3</span><span class="enc-num">4</span><span class="enc-num">5</span></div></td></tr>
+      <tr><td>¿El coordinador fue puntual?</td><td><div class="enc-nums"><span class="enc-num">1</span><span class="enc-num">2</span><span class="enc-num">3</span><span class="enc-num">4</span><span class="enc-num">5</span></div></td></tr>
+      <tr><td colspan="2">
+        <strong>¿Te gustaría algo diferente en tu próxima ocasión? ¡Cuéntanos!</strong>
+        <div class="enc-open-line"></div>
+      </td></tr>
+      <tr><td colspan="2">
+        <strong>¿Qué cree que podemos mejorar para ofrecer un buen servicio?</strong>
+        <div class="enc-open-line"></div>
+      </td></tr>
+      <tr><td colspan="2" class="enc-asesor"><strong>Asesor:</strong> {{ c.asesor or '—' }}</td></tr>
+    </tbody>
+  </table>
+  <div class="medios" style="margin-top:14px;"><b>Medios de pago:</b> {{ medios_pago|safe }}</div>
+</div>
+
+</body>
+</html>

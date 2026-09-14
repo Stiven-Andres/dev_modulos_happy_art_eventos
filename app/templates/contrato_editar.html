@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Editar Contrato — EventStock{% endblock %}
+{% block content %}
+<a href="/contratos" class="btn btn-sm btn-outline-secondary mb-3">← Volver a Contratos</a>
+<h3 class="fw-bold mb-3">✏️ Editar Contrato</h3>
+
+<form method="post" action="/contratos/{{ c.id }}/guardar" id="ecForm">
+<div class="row g-3">
+  <div class="col-md-4"><label class="form-label">Fecha del evento</label><input type="date" name="fecha" class="form-control" value="{{ c.fecha }}"></div>
+  <div class="col-md-4"><label class="form-label">Hora de decoración</label><input type="time" name="horaDecoracion" class="form-control" value="{{ c.horaDecoracion or '' }}"></div>
+  <div class="col-md-4"><label class="form-label">Hora de inicio del evento</label><input type="time" name="hora" class="form-control" value="{{ c.hora or '' }}"></div>
+  <div class="col-12"><label class="form-label">Nombre completo del cliente</label><input type="text" name="cliente" class="form-control" value="{{ c.cliente }}"></div>
+  <div class="col-md-6"><label class="form-label">Teléfono 1</label><input type="tel" name="tel1" maxlength="10" class="form-control" value="{{ c.tel1 }}"></div>
+  <div class="col-md-6"><label class="form-label">Teléfono 2</label><input type="tel" name="tel2" maxlength="10" class="form-control" value="{{ c.tel2 or '' }}"></div>
+  <div class="col-12"><label class="form-label">Dirección</label><input type="text" name="direccion" class="form-control" value="{{ c.direccion or '' }}"></div>
+  <div class="col-md-6"><label class="form-label">Barrio</label><input type="text" name="barrio" class="form-control" value="{{ c.barrio or '' }}"></div>
+  <div class="col-md-6"><label class="form-label">Localidad</label><input type="text" name="localidad" class="form-control" value="{{ c.localidad or '' }}"></div>
+  <div class="col-12"><label class="form-label">Nombre del festejado</label><input type="text" name="festejado" class="form-control" value="{{ c.festejado or '' }}"></div>
+</div>
+
+<div class="mt-4">
+  <div class="fw-bold mb-2">🎉 Cambiar Paquete <span class="fw-normal small">(opcional — toca uno para cambiarlo)</span></div>
+  {% for cat in categorias %}
+  {% set pkgs = paquetes_por_cat[cat.id] %}
+  {% if pkgs %}
+  <div class="small fw-bold text-muted text-uppercase mt-3 mb-2">{{ cat.label }}</div>
+  <div class="row row-cols-2 row-cols-md-4 g-2">
+    {% for p in pkgs %}
+    <div class="col">
+      <button type="button" class="paquete-card w-100 h-100 text-start p-2 bg-white {{ 'selected' if pk_actual and pk_actual.id==p.id }}"
+        hx-post="/contratos/{{ c.id }}/paquete-panel" hx-include="closest form" hx-vals='{"pkId": "{{ p.id }}"}' hx-target="#paquete-panel">
+        <div class="fw-bold small">{{ p.nombreHappy if c.empresa=='happy' else p.nombreConde }}</div>
+        <div class="text-muted" style="font-size:10px;">{{ p.nombreConde if c.empresa=='happy' else p.nombreHappy }}</div>
+        <div class="fw-bold small mt-1">{{ fmt_precio(p.precio) }}</div>
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div id="paquete-panel">
+  {% include "partials/contrato_paquete_panel.html" %}
+</div>
+
+<div class="mt-3" style="max-width:280px;">
+  <label class="form-label">💰 Valor del paquete <span class="small text-muted">(edítalo solo si aplica un precio diferente)</span></label>
+  <input type="text" name="valorPaquete" class="form-control" value="{{ fmt(c.valor) }}" inputmode="numeric">
+</div>
+
+<div class="mt-4">
+  <div class="fw-bold mb-2">➕ Artículos Adicionales</div>
+  {% if c.extras %}
+  <div class="d-flex flex-column gap-2 mb-2">
+    {% for nombre in c.extras %}
+    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f3f0eb;">
+      <span class="small fw-bold">{{ nombre }}</span>
+      <form method="post" action="/contratos/{{ c.id }}/extra-existente/{{ loop.index0 }}/borrar" onsubmit="return confirm('¿Eliminar el adicional {{ nombre }} de este contrato?')">
+        <button class="btn btn-sm btn-outline-danger">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="small text-muted mb-2">Sin adicionales registrados en este contrato.</div>
+  {% endif %}
+
+  <label class="form-label small">Agregar nuevo artículo adicional</label>
+  <div class="position-relative mb-2" style="max-width:420px;">
+    <input type="text" class="form-control" placeholder="Buscar por nombre, código, categoría..." name="q"
+      hx-post="/contratos/{{ c.id }}/extras/buscar" hx-include="closest form" hx-trigger="keyup changed delay:300ms" hx-target="#extras-dropdown">
+    <div id="extras-dropdown"></div>
+  </div>
+  <div id="extras-panel">
+    {% include "partials/venta_extras_chips.html" %}
+  </div>
+</div>
+
+<div class="mt-4">
+  <div class="fw-bold mb-2">👥 Personal necesario para el evento</div>
+  {% set req = c.requerimientosPersonal or {} %}
+  <div class="row g-3">
+    <div class="col-md-3"><label class="form-label">🚚 Logísticos</label><input type="number" min="0" name="pers_logistico" value="{{ req.logistico or 0 }}" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🎭 Recreadores</label><input type="number" min="0" name="pers_recreador" value="{{ req.recreador or 0 }}" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🧭 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="{{ req.coordinador or 0 }}" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🔧 Operarios</label><input type="number" min="0" name="pers_operario" value="{{ req.operario or 0 }}" class="form-control"></div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-end mt-4 pt-3 border-top">
+  <button type="submit" class="btn btn-warning fw-bold px-4 py-2">💾 Guardar cambios</button>
+</div>
+</form>
+{% endblock %}

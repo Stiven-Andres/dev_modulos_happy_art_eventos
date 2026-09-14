@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Programar personal — EventStock{% endblock %}
+{% block content %}
+<a href="/contratos" class="btn btn-sm btn-outline-secondary mb-3">← Volver a Contratos</a>
+<h3 class="fw-bold mb-2">📋 Programar personal</h3>
+<div class="mb-3"><strong>{{ c.cliente }}</strong> — 📅 {{ fmt_fecha_contrato(c.fecha) }} · 🎉 {{ c.paquete }}</div>
+
+<form method="post" action="/contratos/{{ c.id }}/programar-personal">
+{% if not bloques %}
+<div class="text-muted">Este contrato no solicitó personal.</div>
+{% endif %}
+{% for b in bloques %}
+<div class="mb-4">
+  <div class="small fw-bold text-uppercase text-muted mb-2">{{ b.rol.icon }} {{ b.rol.label }} ({{ b.slots|length }})</div>
+  {% for slot in b.slots %}
+  <select name="slot__{{ b.rol.id }}" class="form-select mb-2">
+    <option value="">— Cupo {{ slot.idx + 1 }}: sin asignar —</option>
+    {% for o in slot.opciones %}<option value="{{ o.id }}" {{ 'selected' if o.seleccionado }} {{ 'disabled' if o.deshabilitado }}>{{ o.etiqueta }}</option>{% endfor %}
+  </select>
+  {% endfor %}
+</div>
+{% endfor %}
+<button type="submit" class="btn btn-warning fw-bold">💾 Guardar programación</button>
+</form>
+{% endblock %}

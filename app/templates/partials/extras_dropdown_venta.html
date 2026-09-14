@@ -1,0 +1,12 @@
+<div class="list-group position-absolute w-100 shadow" style="z-index:20;max-height:260px;overflow-y:auto;">
+  {% for p in resultados %}
+  {% set s = stock_status(p) %}
+  <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+    hx-post="{{ add_action or '/ventas/extras/agregar' }}" hx-include="closest form" hx-vals='{"addProdId": {{ p.id }}}' hx-target="#extras-panel">
+    <span><span class="fw-bold">{{ p.nombre }}</span> <span class="small text-muted">{{ p.cat }} · {{ p.sku }}</span></span>
+    <span class="badge {{ 'text-bg-danger' if s=='out' else ('text-bg-warning' if s=='low' else 'text-bg-success') }}">{{ p.stock }} {{ p.unidad }}</span>
+  </button>
+  {% else %}
+  {% if q %}<div class="list-group-item text-muted small">Sin resultados</div>{% endif %}
+  {% endfor %}
+</div>

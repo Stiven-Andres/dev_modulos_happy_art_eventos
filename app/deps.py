@@ -15,6 +15,7 @@ templates.env.globals["fmt_precio"] = models.fmt_precio
 templates.env.globals["fmt_date"] = models.fmt_date
 templates.env.globals["fmt_fecha"] = models.fmt_fecha
 templates.env.globals["fmt_hora_evento"] = models.fmt_hora_evento
+templates.env.globals["fmt_fecha_contrato"] = models.fmt_fecha_contrato
 templates.env.globals["stock_status"] = models.stock_status
 templates.env.globals["cat_class"] = models.cat_class
 templates.env.globals["label_rol_personal"] = models.label_rol_personal
@@ -48,6 +49,13 @@ def require_admin(request: Request):
 def require_asesor_o_admin(request: Request):
     user = require_login(request)
     if user["role"] not in ("admin", "asesor"):
+        raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta sección.")
+    return user
+
+
+def require_admin_o_bodega(request: Request):
+    user = require_login(request)
+    if user["role"] not in ("admin", "bodega"):
         raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta sección.")
     return user
 
