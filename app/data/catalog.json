@@ -4,9 +4,9 @@
       "admin@happyarteventos.com"
     ],
     "ASESOR_EMAILS": [
-      "asesor@test.com",
       "brayang@asesoreventos.com",
-      "eduardv@asesoreventos.com"
+      "eduardv@asesoreventos.com",
+      "paulal@asesoreventos.com"
     ],
     "BODEGA_EMAILS": [
       "jennyer@happyarteventos.com"
@@ -16,30 +16,49 @@
     {
       "id": "logistico",
       "label": "Logístico",
-      "icon": "🚚"
+      "labelPlural": "Logísticos",
+      "icon": "🧰"
     },
     {
       "id": "recreador",
       "label": "Recreador",
+      "labelPlural": "Recreadores",
       "icon": "🎭"
     },
     {
       "id": "coordinador",
       "label": "Coordinador",
-      "icon": "🧭"
+      "labelPlural": "Coordinadores",
+      "icon": "🎯"
     },
     {
       "id": "operario",
       "label": "Operario",
+      "labelPlural": "Operarios",
       "icon": "🔧"
     }
   ],
   "CUENTAS_PAGO": [
-    "Nequi",
-    "Llave",
-    "Daviplata",
-    "Bancolombia",
-    "Efectivo"
+    {
+      "id": "nequi",
+      "label": "Nequi"
+    },
+    {
+      "id": "llave",
+      "label": "Llave"
+    },
+    {
+      "id": "daviplata",
+      "label": "Daviplata"
+    },
+    {
+      "id": "bancolombia",
+      "label": "Bancolombia"
+    },
+    {
+      "id": "efectivo",
+      "label": "Efectivo"
+    }
   ],
   "RECUPERABLES_KEYWORDS": [
     "taller de payaso",
@@ -1110,6 +1129,15 @@
         "3 horas de decoración antes del evento",
         "3 horas de animación"
       ]
+    },
+    {
+      "id": "paquete_personalizado",
+      "categoria": "personalizado",
+      "nombre": "Paquete Personalizado",
+      "nombreHappy": "Paquete Personalizado",
+      "nombreConde": "Paquete Personalizado",
+      "precio": 0,
+      "items": []
     }
   ],
   "MESES_CORTOS": [
@@ -1195,5 +1223,11 @@
         "mejora"
       ]
     }
-  ]
+  ],
+  "ROL_PERSONAL_STAFF_EXTRA": {
+    "id": "asesor",
+    "label": "Asesor",
+    "labelPlural": "Asesores",
+    "icon": "💼"
+  }
 }

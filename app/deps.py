@@ -12,6 +12,7 @@ from app import models
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["fmt"] = models.fmt
 templates.env.globals["fmt_precio"] = models.fmt_precio
+templates.env.globals["valor_total_contrato"] = models.valor_total_contrato
 templates.env.globals["fmt_date"] = models.fmt_date
 templates.env.globals["fmt_fecha"] = models.fmt_fecha
 templates.env.globals["fmt_hora_evento"] = models.fmt_hora_evento
@@ -19,7 +20,12 @@ templates.env.globals["fmt_fecha_contrato"] = models.fmt_fecha_contrato
 templates.env.globals["stock_status"] = models.stock_status
 templates.env.globals["cat_class"] = models.cat_class
 templates.env.globals["label_rol_personal"] = models.label_rol_personal
+templates.env.globals["label_rol_personal_plural"] = models.label_rol_personal_plural
+templates.env.globals["icono_rol_personal"] = models.icono_rol_personal
+templates.env.globals["fmt_hora_bodega"] = models.fmt_hora_bodega
+templates.env.globals["calc_minutos_hora_bodega"] = models.calc_minutos_hora_bodega
 templates.env.globals["ROLES_PERSONAL"] = models.ROLES_PERSONAL
+templates.env.globals["ROLES_PERSONAL_STAFF"] = models.ROLES_PERSONAL_STAFF
 templates.env.globals["CUENTAS_PAGO"] = models.CUENTAS_PAGO
 
 

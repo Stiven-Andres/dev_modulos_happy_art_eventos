@@ -4,70 +4,78 @@
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
     <h3 class="fw-bold mb-0">Personal 👥</h3>
-    <div class="text-muted">{{ personal|length }} empleado(s)</div>
+    <div class="text-muted">{{ total }} integrante(s)</div>
   </div>
-  <button class="btn btn-warning fw-bold" onclick="abrirNuevo()" data-bs-toggle="modal" data-bs-target="#modalPersonal">+ Nuevo empleado</button>
+  <button class="btn btn-warning fw-bold" onclick="abrirNuevo()" data-bs-toggle="modal" data-bs-target="#modalPersonal">+ Nuevo Personal</button>
 </div>
 
-<form method="get" action="/personal" class="mb-3" style="max-width:260px;">
-  <select name="rol" class="form-select" onchange="this.form.submit()">
-    <option value="">Todos los roles</option>
-    {% for r in ROLES_PERSONAL %}<option value="{{ r.id }}" {{ 'selected' if r.id==filtro_rol }}>{{ r.icon }} {{ r.label }}</option>{% endfor %}
-  </select>
+<form method="get" action="/personal" class="mb-4" style="max-width:340px;">
+  <div class="input-group">
+    <span class="input-group-text">🔎</span>
+    <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre... (Enter)">
+  </div>
 </form>
 
-<div class="row row-cols-1 row-cols-md-3 g-3">
-  {% for p in personal %}
-  {% set r = (ROLES_PERSONAL | selectattr('id','equalto',p.rol) | first) or {'label': p.rol, 'icon': '👤'} %}
-  <div class="col">
-    <div class="card h-100 shadow-sm">
-      <div class="card-body">
-        <div class="fw-bold">{{ r.icon }} {{ p.nombre }}</div>
-        <div class="small text-muted mb-2">{{ r.label }}{% if p.edad %} · {{ p.edad }} años{% endif %}</div>
-        <div class="small mb-2">
-          📞 {{ p.telefono or '—' }}<br>
-          💳 {{ p.cuentaTipo or '—' }}<br>
-          🏠 {{ p.direccion or '—' }}
-        </div>
-        {% set nd = (p.noDisponibleFechas or [])|length %}
-        {% if nd %}<div class="small text-danger fw-bold mb-2">🚫 {{ nd }} fecha(s) no disponible</div>{% endif %}
-        <div class="d-flex justify-content-end gap-1">
-          <a href="/personal/{{ p.id }}/disponibilidad" class="btn btn-outline-secondary btn-sm" title="Disponibilidad">📅</a>
-          <button class="btn btn-outline-secondary btn-sm" title="Editar" onclick='abrirEditar({{ p|tojson }})' data-bs-toggle="modal" data-bs-target="#modalPersonal">✎</button>
-          <form method="post" action="/personal/{{ p.id }}/eliminar" onsubmit="return confirm('¿Eliminar este empleado? También se quitará de cualquier evento donde esté programado.')" class="d-inline">
-            <button class="btn btn-outline-danger btn-sm" title="Eliminar">✕</button>
-          </form>
-        </div>
-      </div>
-    </div>
+{% for g in grupos %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <span class="fw-bold">{{ g.rol.icon }} {{ g.rol.labelPlural }}</span>
+    <span class="badge text-bg-light">{{ g.personal|length }}</span>
+  </div>
+  {% if not g.personal %}
+  <div class="text-muted small border rounded p-3 text-center" style="border-style:dashed !important;">
+    {{ 'Sin resultados para esta búsqueda.' if q else 'Sin ' ~ g.rol.labelPlural|lower ~ ' registrados todavía.' }}
   </div>
   {% else %}
-  <div class="col-12 text-center text-muted py-5">👥 Sin personal registrado</div>
-  {% endfor %}
+  <div class="d-flex flex-column gap-2">
+    {% for p in g.personal %}
+    {% set nd = (p.noDisponible or [])|length %}
+    <div class="d-flex align-items-center gap-3 border rounded p-2 px-3 flex-wrap">
+      <div class="flex-grow-1" style="min-width:220px;">
+        <div class="fw-bold">{{ p.nombre }}</div>
+        <div class="small text-muted">{% if p.edad %}🎂 {{ p.edad }} años · {% endif %}📞 {{ p.telefono or '—' }} · 🏠 {{ p.direccion or '—' }}</div>
+        <div class="small text-muted">
+          💳 {{ (CUENTAS_PAGO | selectattr('id','equalto',p.cuentaTipo) | first).label if (CUENTAS_PAGO | selectattr('id','equalto',p.cuentaTipo) | list) else p.cuentaTipo }}{% if p.cuentaNumero %} · {{ p.cuentaNumero }}{% endif %}
+          {% if nd %}· <span class="text-warning fw-bold">🚫 {{ nd }} fecha(s) no disponible</span>{% else %}· <span class="text-success fw-bold">✅ Disponible todos los días</span>{% endif %}
+        </div>
+      </div>
+      <div class="d-flex gap-1 flex-shrink-0">
+        <a href="/personal/{{ p.id }}/disponibilidad" class="btn btn-outline-secondary btn-sm" title="Disponibilidad">📅</a>
+        <button class="btn btn-outline-secondary btn-sm" title="Editar" onclick='abrirEditar({{ p|tojson }})' data-bs-toggle="modal" data-bs-target="#modalPersonal">✏️</button>
+        <form method="post" action="/personal/{{ p.id }}/eliminar" onsubmit="return confirm('¿Eliminar este integrante del personal? Se quitará también de cualquier evento donde esté programado.')" class="d-inline">
+          <button class="btn btn-outline-danger btn-sm" title="Eliminar">🗑</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
+{% endfor %}
 
 <div class="modal fade" id="modalPersonal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="formPersonal" action="/personal/nuevo">
-        <div class="modal-header"><h5 class="modal-title" id="personalModalTitle">👥 Nuevo empleado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title" id="personalModalTitle">👤 Nuevo Personal</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-3">
           <div class="col-12"><label class="form-label">Nombre completo</label><input class="form-control" name="nombre" id="pe_nombre" required></div>
+          <div class="col-md-6"><label class="form-label">Edad</label><input type="number" min="16" max="80" class="form-control" name="edad" id="pe_edad"></div>
+          <div class="col-md-6"><label class="form-label">Teléfono</label><input class="form-control" name="telefono" id="pe_telefono" maxlength="10"></div>
+          <div class="col-12"><label class="form-label">Dirección de residencia</label><input class="form-control" name="direccion" id="pe_direccion"></div>
           <div class="col-md-6"><label class="form-label">Rol</label>
             <select class="form-select" name="rol" id="pe_rol">
-              {% for r in ROLES_PERSONAL %}<option value="{{ r.id }}">{{ r.icon }} {{ r.label }}</option>{% endfor %}
+              {% for r in ROLES_PERSONAL_STAFF %}<option value="{{ r.id }}">{{ r.icon }} {{ r.label }}</option>{% endfor %}
             </select>
           </div>
-          <div class="col-md-6"><label class="form-label">Edad</label><input type="number" min="18" max="80" class="form-control" name="edad" id="pe_edad"></div>
-          <div class="col-md-6"><label class="form-label">Teléfono</label><input class="form-control" name="telefono" id="pe_telefono" maxlength="10"></div>
-          <div class="col-md-6"><label class="form-label">Tipo de cuenta de pago</label>
-            <select class="form-select" name="cuentaTipo" id="pe_cuenta_tipo">{% for c in CUENTAS_PAGO %}<option>{{ c }}</option>{% endfor %}</select>
+          <div class="col-md-6"><label class="form-label">Cuenta de pago</label>
+            <select class="form-select" name="cuentaTipo" id="pe_cuenta_tipo">{% for c in CUENTAS_PAGO %}<option value="{{ c.id }}">{{ c.label }}</option>{% endfor %}</select>
           </div>
-          <div class="col-12"><label class="form-label">Dirección de residencia</label><input class="form-control" name="direccion" id="pe_direccion"></div>
+          <div class="col-12"><label class="form-label">Número de cuenta / celular <span class="small text-muted">(opcional)</span></label><input class="form-control" name="cuentaNumero" id="pe_cuenta_numero" maxlength="15"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-warning fw-bold">💾 Guardar empleado</button>
+          <button type="submit" class="btn btn-warning fw-bold">💾 Guardar</button>
         </div>
       </form>
     </div>
@@ -75,19 +83,20 @@
 </div>
 <script>
 function abrirNuevo(){
-  document.getElementById('personalModalTitle').textContent='👥 Nuevo empleado';
+  document.getElementById('personalModalTitle').textContent='👤 Nuevo Personal';
   document.getElementById('formPersonal').action='/personal/nuevo';
   document.getElementById('formPersonal').reset();
 }
 function abrirEditar(p){
-  document.getElementById('personalModalTitle').textContent='👥 Editar empleado';
+  document.getElementById('personalModalTitle').textContent='👤 Editar Personal';
   document.getElementById('formPersonal').action='/personal/'+p.id+'/editar';
   document.getElementById('pe_nombre').value=p.nombre;
-  document.getElementById('pe_rol').value=p.rol;
   document.getElementById('pe_edad').value=p.edad||'';
   document.getElementById('pe_telefono').value=p.telefono||'';
-  document.getElementById('pe_cuenta_tipo').value=p.cuentaTipo||'Nequi';
   document.getElementById('pe_direccion').value=p.direccion||'';
+  document.getElementById('pe_rol').value=p.rol;
+  document.getElementById('pe_cuenta_tipo').value=p.cuentaTipo||'nequi';
+  document.getElementById('pe_cuenta_numero').value=p.cuentaNumero||'';
 }
 </script>
 {% endblock %}

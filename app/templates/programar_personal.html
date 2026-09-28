@@ -2,24 +2,37 @@
 {% block title %}Programar personal — EventStock{% endblock %}
 {% block content %}
 <a href="/contratos" class="btn btn-sm btn-outline-secondary mb-3">← Volver a Contratos</a>
-<h3 class="fw-bold mb-2">📋 Programar personal</h3>
-<div class="mb-3"><strong>{{ c.cliente }}</strong> — 📅 {{ fmt_fecha_contrato(c.fecha) }} · 🎉 {{ c.paquete }}</div>
+<h3 class="fw-bold mb-2">🗓️ Programar personal — {{ c.cliente }}</h3>
+<div class="text-muted mb-3">📅 {{ fmt_fecha_contrato(c.fecha) }} · ⏰ {{ hora_evento or '—' }} · 🧰 En bodega: {{ hora_bodega }}</div>
 
 <form method="post" action="/contratos/{{ c.id }}/programar-personal">
 {% if not bloques %}
-<div class="text-muted">Este contrato no solicitó personal.</div>
+<div class="text-muted">Este contrato no solicitó personal. Edítalo desde Contratos para indicar cuántos logísticos, recreadores, coordinadores u operarios necesita.</div>
 {% endif %}
 {% for b in bloques %}
 <div class="mb-4">
-  <div class="small fw-bold text-uppercase text-muted mb-2">{{ b.rol.icon }} {{ b.rol.label }} ({{ b.slots|length }})</div>
-  {% for slot in b.slots %}
-  <select name="slot__{{ b.rol.id }}" class="form-select mb-2">
-    <option value="">— Cupo {{ slot.idx + 1 }}: sin asignar —</option>
-    {% for o in slot.opciones %}<option value="{{ o.id }}" {{ 'selected' if o.seleccionado }} {{ 'disabled' if o.deshabilitado }}>{{ o.etiqueta }}</option>{% endfor %}
-  </select>
-  {% endfor %}
+  <div class="small fw-bold mb-2">
+    {{ b.rol.icon }} {{ b.rol.labelPlural }}
+    <span class="{{ 'text-success' if b.asignados >= b.necesarios else 'text-warning' }} fw-bold">({{ b.asignados }} de {{ b.necesarios }})</span>
+  </div>
+  {% if not b.opciones %}
+  <div class="text-muted small">No hay {{ b.rol.labelPlural|lower }} registrados. Agrégalos en la sección Personal.</div>
+  {% else %}
+  <div class="d-flex flex-column gap-2">
+    {% for o in b.opciones %}
+    <label class="d-flex align-items-center gap-2 border rounded p-2 px-3 {{ 'opacity-50' if o.deshabilitado }}">
+      <input type="checkbox" class="form-check-input" name="sel__{{ b.rol.id }}" value="{{ o.id }}" {{ 'checked' if o.marcado }} {{ 'disabled' if o.deshabilitado }}>
+      <span class="flex-grow-1">{{ o.nombre }}{% if o.telefono %} · 📞 {{ o.telefono }}{% endif %}</span>
+      {% if o.motivo %}<span class="small text-danger fw-bold">{{ o.motivo }}</span>{% endif %}
+    </label>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 {% endfor %}
-<button type="submit" class="btn btn-warning fw-bold">💾 Guardar programación</button>
+<div class="d-flex justify-content-between">
+  <a href="/contratos" class="btn btn-outline-secondary">Cancelar</a>
+  <button type="submit" class="btn btn-warning fw-bold">💾 Guardar programación</button>
+</div>
 </form>
 {% endblock %}

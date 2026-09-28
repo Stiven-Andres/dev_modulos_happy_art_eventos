@@ -1,4 +1,58 @@
-<input type="hidden" name="pkId" value="{{ pk.id if pk else '' }}">
+<input type="hidden" name="currentPkId" value="{{ pk.id if pk else '' }}">
+
+<div class="mt-3" style="max-width:280px;">
+  <label class="form-label">💰 Valor del paquete <span class="small text-muted">(edítalo solo si aplica un precio diferente)</span></label>
+  <input type="text" name="valorPaquete" id="ec_valor_paquete" class="form-control" value="{{ fmt(c.valor) }}" inputmode="numeric" oninput="ecActualizarTotal()">
+</div>
+<div class="mt-2" style="max-width:280px;">
+  <label class="form-label">🚐 Transporte intermunicipal <span class="small text-muted">(solo si aplica)</span></label>
+  <input type="text" name="transporte" id="ec_transporte" class="form-control" value="{{ fmt(c.transporte) if c.transporte else '' }}" inputmode="numeric" placeholder="0" oninput="ecActualizarTotal()">
+  <div class="form-text" id="ec_total_preview" style="display:none;"></div>
+</div>
+<script>
+function ecActualizarTotal(){
+  var t = parseInt((document.getElementById('ec_transporte').value||'').replace(/[^0-9]/g,'')) || 0;
+  var box = document.getElementById('ec_total_preview');
+  if(t <= 0){ box.style.display='none'; return; }
+  var v = parseInt((document.getElementById('ec_valor_paquete').value||'').replace(/[^0-9]/g,'')) || 0;
+  box.style.display='block';
+  box.textContent = 'Valor del paquete que verá el cliente en el contrato: $' + (v+t).toLocaleString('es-CO');
+}
+ecActualizarTotal();
+</script>
+
+{% if pk %}
+<div class="d-flex align-items-center justify-content-between mt-3">
+  <div class="small fw-bold text-uppercase text-muted">✅ Ítems incluidos <span class="fw-normal text-lowercase">(quítalos si el cliente no los quiere)</span></div>
+  {% if items_modificados %}
+  <button type="button" class="btn btn-sm btn-outline-secondary" hx-post="/contratos/{{ c.id }}/item/restablecer" hx-include="closest form" hx-target="#paquete-panel">↺ Restablecer</button>
+  {% endif %}
+</div>
+<ul class="list-group list-group-flush mb-2">
+  {% for item in items %}
+  <li class="list-group-item px-2">
+    {% if loop.index0 == editando_idx %}
+    <div class="d-flex gap-2">
+      <input type="text" class="form-control form-control-sm" name="item_edit_texto" value="{{ item }}" autofocus>
+      <button type="button" class="btn btn-sm btn-primary" hx-post="/contratos/{{ c.id }}/item/guardar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Guardar">✔</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" hx-post="/contratos/{{ c.id }}/item/cancelar" hx-include="closest form" hx-target="#paquete-panel" title="Cancelar">✕</button>
+    </div>
+    {% else %}
+    <div class="d-flex justify-content-between align-items-center gap-2">
+      <span class="small">{{ item }}</span>
+      <span class="flex-shrink-0">
+        <button type="button" class="btn btn-sm btn-link p-0 me-2" hx-post="/contratos/{{ c.id }}/item/editar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Editar">✏️</button>
+        <button type="button" class="btn btn-sm btn-link text-danger p-0" hx-post="/contratos/{{ c.id }}/item/quitar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Quitar">✕</button>
+      </span>
+    </div>
+    {% endif %}
+    <input type="hidden" name="item_texto" value="{{ item }}">
+  </li>
+  {% else %}
+  <li class="list-group-item px-2 text-muted small fst-italic">Sin ítems — agrégalos desde "Artículos Adicionales" más abajo.</li>
+  {% endfor %}
+</ul>
+
 {% if pendientes_variante %}
 <div class="small fw-bold text-uppercase text-muted mt-3">🎭 Especifica cuál necesita el cliente</div>
 {% for p in pendientes_variante %}
@@ -12,4 +66,5 @@
   </select>
 </div>
 {% endfor %}
+{% endif %}
 {% endif %}

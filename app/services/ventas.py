@@ -17,6 +17,7 @@ CATEGORIAS_PAQUETE = [
     {"id": "cumpleanos", "label": "🎂 Cumpleaños"},
     {"id": "baby_shower", "label": "👶 Baby Shower"},
     {"id": "revelacion", "label": "🎀 Revelación de Género"},
+    {"id": "personalizado", "label": "✨ Personalizado"},
 ]
 
 
@@ -136,7 +137,7 @@ def detectar_letras_numero(productos, pk, festejado, anios):
     return extras_list, mensajes, faltantes
 
 
-def registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, asesor_email):
+def registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, asesor_email, items_editados=None):
     fecha = form.get("fecha") or ""
     cliente = (form.get("cliente") or "").strip()
     tel1 = (form.get("tel1") or "").strip()
@@ -148,9 +149,13 @@ def registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, a
     if not telefono_valido(tel2):
         raise ValidationError("El teléfono 2 debe tener exactamente 10 dígitos (ej: 3102112655)")
 
-    pk = get_paquete(pk_id)
-    if not pk:
+    pk_original = get_paquete(pk_id)
+    if not pk_original:
         raise ValidationError("Paquete no encontrado")
+    # Ítems realmente incluidos en el contrato: el paquete de catálogo con las
+    # ediciones que haya hecho el asesor (ítems quitados/reemplazados).
+    items_efectivos = items_editados if items_editados is not None else pk_original["items"]
+    pk = {**pk_original, "items": items_efectivos}
 
     productos = state["productos"]
     descontados_paquete, faltan_variante = resolver_items_paquete_inventario(productos, pk, variantes_sel)
@@ -170,7 +175,10 @@ def registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, a
 
     valor_input = form.get("valorPaquete") or ""
     valor_input_num = int(re.sub(r"[^0-9]", "", valor_input) or 0)
-    valor_final = valor_input_num if valor_input_num > 0 else pk["precio"]
+    if pk_original.get("categoria") == "personalizado" and valor_input_num <= 0:
+        raise ValidationError("Ingresa el valor acordado para el paquete personalizado")
+    valor_final = valor_input_num if valor_input_num > 0 else pk_original["precio"]
+    transporte = int(re.sub(r"[^0-9]", "", form.get("transporte") or "") or 0)
 
     requerimientos_personal = {
         "logistico": int(form.get("pers_logistico") or 0),
@@ -185,10 +193,11 @@ def registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, a
         "cliente": cliente, "tel1": tel1, "tel2": tel2,
         "direccion": (form.get("direccion") or "").strip(), "barrio": (form.get("barrio") or "").strip(),
         "localidad": (form.get("localidad") or "").strip(), "festejado": (form.get("festejado") or "").strip(),
-        "paquete": pk["nombre"], "valor": valor_final, "valorCatalogo": pk["precio"],
-        "items": pk["items"] + extras_nombres, "extras": extras_nombres,
+        "paquete": pk_original["nombre"], "valor": valor_final, "transporte": transporte,
+        "valorCatalogo": pk_original["precio"],
+        "items": items_efectivos + extras_nombres, "extras": extras_nombres,
         "descontadosPaquete": descontados_paquete, "fechaRegistro": int(time.time() * 1000),
-        "asesor": asesor_email, "requerimientosPersonal": requerimientos_personal,
+        "asesor": asesor_email, "personalRequerido": requerimientos_personal,
         "personalAsignado": {"logistico": [], "recreador": [], "coordinador": [], "operario": []},
     }
     state["nextContratoId"] += 1

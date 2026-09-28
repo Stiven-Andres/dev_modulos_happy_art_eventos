@@ -26,7 +26,7 @@ def _check_permiso(c, es_admin, email):
         raise ForbiddenError("Solo el asesor que creó este contrato puede editarlo")
 
 
-def editar_contrato(state, contrato_id, form, pk_id_nuevo, variantes_sel, extras_nuevos, es_admin, email):
+def editar_contrato(state, contrato_id, form, pk_id_actual, items_editados, variantes_sel, extras_nuevos, es_admin, email):
     c = get_contrato(state, contrato_id)
     if not c:
         raise ValidationError("Contrato no encontrado")
@@ -56,7 +56,7 @@ def editar_contrato(state, contrato_id, form, pk_id_nuevo, variantes_sel, extras
         "coordinador": int(form.get("pers_coordinador") or 0),
         "operario": int(form.get("pers_operario") or 0),
     }
-    c["requerimientosPersonal"] = nuevo_req
+    c["personalRequerido"] = nuevo_req
     c.setdefault("personalAsignado", {"logistico": [], "recreador": [], "coordinador": [], "operario": []})
     recorte = False
     for rol in ROLES_PERSONAL:
@@ -66,11 +66,15 @@ def editar_contrato(state, contrato_id, form, pk_id_nuevo, variantes_sel, extras
             recorte = True
 
     pk_ref = next((p for p in PAQUETES if p["nombre"] == c["paquete"]), None)
-    if pk_id_nuevo:
-        pk = get_paquete(pk_id_nuevo)
-        if pk:
+    if pk_id_actual:
+        pk_base = get_paquete(pk_id_actual)
+        if pk_base:
+            # Se respetan los ítems editados por el asesor (ítems quitados o
+            # reemplazados), no la lista fija de catálogo.
+            items_efectivos = items_editados if items_editados is not None else list(pk_base["items"])
+            pk = {**pk_base, "items": items_efectivos}
             c["paquete"] = pk["nombre"]
-            c["items"] = list(pk["items"])
+            c["items"] = list(items_efectivos)
             pk_ref = pk
             resueltos, faltan_variante = resolver_items_paquete_inventario(state["productos"], pk, variantes_sel)
             if faltan_variante:
@@ -81,6 +85,7 @@ def editar_contrato(state, contrato_id, form, pk_id_nuevo, variantes_sel, extras
     if valor_input > 0:
         c["valor"] = valor_input
         c["valorCatalogo"] = pk_ref["precio"] if pk_ref else c.get("valorCatalogo")
+    c["transporte"] = int(re.sub(r"[^0-9]", "", form.get("transporte") or "") or 0)
 
     nuevos_extras_nombres = []
     for sel in extras_nuevos:
@@ -122,6 +127,21 @@ def borrar_contrato(state, contrato_id, es_admin, email):
     state["contratos"] = [x for x in state["contratos"] if x["id"] != contrato_id]
 
 
+def items_iniciales_contrato(c, pk_actual):
+    """Ítems del paquete (sin los extras) tal como quedaron guardados en el
+    contrato — para que al editar se vea lo que ya se había quitado antes,
+    en vez de reaparecer los ítems originales del catálogo. Portado de la
+    inicialización de _ecItemsPaquete en editarContrato()."""
+    if not pk_actual:
+        return []
+    extras_len = len(c.get("extras") or [])
+    items = c.get("items") or []
+    items_paquete = items[: max(0, len(items) - extras_len)]
+    if not items_paquete and pk_actual["items"]:
+        items_paquete = list(pk_actual["items"])
+    return items_paquete
+
+
 def precargar_variantes_desde_contrato(productos, pk, descontados_paquete):
     """Empareja lo ya guardado en c.descontadosPaquete con las opciones de
     cada variante pendiente del paquete, para no exigir reconfirmar
@@ -159,13 +179,20 @@ def precargar_variantes_desde_contrato(productos, pk, descontados_paquete):
 
 
 def programar_personal(state, contrato_id, selecciones):
-    """selecciones: {rolId: [personalId|None, ...]}"""
+    """selecciones: {rolId: [personalId, ...]} (checkboxes marcados por rol)."""
     c = get_contrato(state, contrato_id)
     if not c:
         raise ValidationError("Contrato no encontrado")
     todos = [pid for slots in selecciones.values() for pid in slots if pid]
     if len(set(todos)) != len(todos):
         raise ValidationError("No puedes asignar la misma persona en dos cupos del mismo evento")
+    req = c.get("personalRequerido") or {}
+    for rol in ROLES_PERSONAL:
+        necesarios = int(req.get(rol["id"]) or 0)
+        elegidos = len([pid for pid in selecciones.get(rol["id"], []) if pid])
+        if elegidos > necesarios:
+            raise ValidationError(
+                f"No puedes asignar más {rol['labelPlural'].lower()} que los solicitados ({necesarios})")
     c.setdefault("personalAsignado", {})
     for rol in ROLES_PERSONAL:
         c["personalAsignado"][rol["id"]] = [pid for pid in selecciones.get(rol["id"], []) if pid]

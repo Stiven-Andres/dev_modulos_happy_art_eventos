@@ -81,7 +81,7 @@
   <tr><td>Barrio</td><td>{{ c.barrio }}</td></tr>
   <tr><td>Localidad</td><td>{{ c.localidad }}</td></tr>
   <tr><td>Tipo de Paquete</td><td><strong>{{ c.paquete }}</strong></td></tr>
-  <tr><td>Valor del Paquete</td><td><strong style="color:{{ color_empresa }};font-size:12pt;">{{ fmt_precio(c.valor) }}</strong>
+  <tr><td>Valor del Paquete</td><td><strong style="color:{{ color_empresa }};font-size:12pt;">{{ fmt_precio(valor_total_contrato(c)) }}</strong>
     {% if c.valorCatalogo and c.valorCatalogo != c.valor %}<span style="font-size:9pt;color:#888;">(precio de catálogo: {{ fmt_precio(c.valorCatalogo) }})</span>{% endif %}</td></tr>
   <tr><td>Asesor</td><td>{{ c.asesor or '—' }}</td></tr>
 </table>

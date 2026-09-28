@@ -9,7 +9,10 @@ from fastapi.responses import Response, StreamingResponse
 
 from app import firebase
 from app.deps import redirect_to, require_admin, require_login, templates
-from app.models import ROLES_PERSONAL, esta_disponible, fmt_fecha_contrato, persona_asignada_en_fecha
+from app.models import (
+    ROLES_PERSONAL, contratos_ocupado_en_fecha, esta_disponible, fmt_fecha_contrato, fmt_hora_bodega,
+    fmt_hora_evento,
+)
 from app.services import contratos as svc
 from app.services import ventas as ventas_svc
 from app.services.calculos import puede_editar_contrato
@@ -23,23 +26,25 @@ def _con_permiso(state, c, user):
 
 
 @router.get("/contratos")
-def ver_contratos(request: Request, user=Depends(require_login), fecha: str = "", recien_creado: int = 0):
+def ver_contratos(request: Request, user=Depends(require_login), fecha: str = "", empresa: str = "", recien_creado: int = 0):
     if user["role"] == "bodega":
         raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta sección.")
     state = firebase.get_state()
     lista = sorted(state["contratos"], key=lambda c: c["fechaRegistro"], reverse=True)
     if fecha:
         lista = [c for c in lista if c.get("fecha") == fecha]
+    if empresa in ("happy", "conde"):
+        lista = [c for c in lista if c.get("empresa") == empresa]
     for c in lista:
         c["_autorizado"] = _con_permiso(state, c, user)
-        req = c.get("requerimientosPersonal") or {}
+        req = c.get("personalRequerido") or {}
         asign = c.get("personalAsignado") or {}
         c["_resumen_personal"] = [
             {"icon": r["icon"], "asignados": len(asign.get(r["id"]) or []), "requeridos": req.get(r["id"], 0)}
             for r in ROLES_PERSONAL if req.get(r["id"], 0) > 0
         ]
     return templates.TemplateResponse(request, "contratos.html", {
-        "user": user, "active_view": "contratos", "contratos": lista, "fecha": fecha,
+        "user": user, "active_view": "contratos", "contratos": lista, "fecha": fecha, "empresa": empresa,
         "fecha_label": fmt_fecha_contrato(fecha) if fecha else "", "recien_creado": recien_creado,
     })
 
@@ -89,6 +94,22 @@ def descargar_todos_fecha(request: Request, user=Depends(require_login), fecha: 
 
 # ── Edición de contrato ──────────────────────────────────────────────────────
 
+def _items_from_form(form):
+    return [i for i in form.getlist("item_texto")]
+
+
+async def _ec_paquete_ctx(request, id, form, pk, items, editando_idx, variantes_sel=None):
+    state = firebase.get_state()
+    c = svc.get_contrato(state, id)
+    pk_ef = {**pk, "items": items} if pk else None
+    pendientes_variante = ventas_svc.pendientes_variante_paquete(state["productos"], pk_ef) if pk_ef else []
+    return {
+        "c": c, "pk": pk, "items": items, "editando_idx": editando_idx,
+        "items_modificados": bool(pk) and items != pk["items"],
+        "pendientes_variante": pendientes_variante, "variantes_sel": variantes_sel or {},
+    }
+
+
 @router.get("/contratos/{id}/editar")
 def editar_form(id: int, request: Request, user=Depends(require_login)):
     state = firebase.get_state()
@@ -98,14 +119,17 @@ def editar_form(id: int, request: Request, user=Depends(require_login)):
         return redirect_to("/contratos")
 
     pk_actual = next((p for p in ventas_svc.PAQUETES if p["nombre"] == c["paquete"]), None)
+    items = svc.items_iniciales_contrato(c, pk_actual)
     variantes_sel = {}
     if pk_actual:
         variantes_sel = svc.precargar_variantes_desde_contrato(state["productos"], pk_actual, c.get("descontadosPaquete") or [])
-    pendientes_variante = ventas_svc.pendientes_variante_paquete(state["productos"], pk_actual) if pk_actual else []
+    pk_ef = {**pk_actual, "items": items} if pk_actual else None
+    pendientes_variante = ventas_svc.pendientes_variante_paquete(state["productos"], pk_ef) if pk_ef else []
     paquetes_por_cat = {cat["id"]: [p for p in ventas_svc.PAQUETES if p["categoria"] == cat["id"]] for cat in ventas_svc.CATEGORIAS_PAQUETE}
 
     return templates.TemplateResponse(request, "contrato_editar.html", {
-        "user": user, "active_view": "contratos", "c": c, "pk_actual": pk_actual,
+        "user": user, "active_view": "contratos", "c": c, "pk_actual": pk_actual, "pk": pk_actual,
+        "items": items, "items_modificados": False, "editando_idx": None,
         "categorias": ventas_svc.CATEGORIAS_PAQUETE, "paquetes_por_cat": paquetes_por_cat,
         "pendientes_variante": pendientes_variante, "variantes_sel": variantes_sel,
     })
@@ -114,14 +138,68 @@ def editar_form(id: int, request: Request, user=Depends(require_login)):
 @router.post("/contratos/{id}/paquete-panel")
 async def editar_paquete_panel(id: int, request: Request, user=Depends(require_login)):
     form = await request.form()
-    state = firebase.get_state()
-    c = svc.get_contrato(state, id)
-    pk_id = form.get("pkId") or form.get("currentPkId") or ""
+    pk_id_nuevo = form.get("pkId") or ""
+    pk_id = pk_id_nuevo or form.get("currentPkId") or ""
     pk = ventas_svc.get_paquete(pk_id) if pk_id else None
-    pendientes_variante = ventas_svc.pendientes_variante_paquete(state["productos"], pk) if pk else []
-    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", {
-        "c": c, "pk": pk, "pendientes_variante": pendientes_variante, "variantes_sel": {},
-    })
+    if pk_id_nuevo:
+        items = list(pk["items"]) if pk else []
+    else:
+        items = _items_from_form(form) or (list(pk["items"]) if pk else [])
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, None)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
+
+
+@router.post("/contratos/{id}/item/editar")
+async def ec_item_editar(id: int, request: Request, user=Depends(require_login)):
+    form = await request.form()
+    pk = ventas_svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, idx)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
+
+
+@router.post("/contratos/{id}/item/guardar")
+async def ec_item_guardar(id: int, request: Request, user=Depends(require_login)):
+    form = await request.form()
+    pk = ventas_svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    nuevo = (form.get("item_edit_texto") or "").strip()
+    if nuevo and 0 <= idx < len(items):
+        items[idx] = nuevo
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, None)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
+
+
+@router.post("/contratos/{id}/item/cancelar")
+async def ec_item_cancelar(id: int, request: Request, user=Depends(require_login)):
+    form = await request.form()
+    pk = ventas_svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, None)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
+
+
+@router.post("/contratos/{id}/item/quitar")
+async def ec_item_quitar(id: int, request: Request, user=Depends(require_login)):
+    form = await request.form()
+    pk = ventas_svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    if 0 <= idx < len(items):
+        items.pop(idx)
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, None)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
+
+
+@router.post("/contratos/{id}/item/restablecer")
+async def ec_item_restablecer(id: int, request: Request, user=Depends(require_login)):
+    form = await request.form()
+    pk = ventas_svc.get_paquete(form.get("currentPkId") or "")
+    items = list(pk["items"]) if pk else []
+    ctx = await _ec_paquete_ctx(request, id, form, pk, items, None)
+    return templates.TemplateResponse(request, "partials/contrato_paquete_panel.html", ctx)
 
 
 @router.post("/contratos/{id}/extras/buscar")
@@ -213,12 +291,13 @@ def _variantes_from_form(form):
 @router.post("/contratos/{id}/guardar")
 async def guardar_edicion(id: int, request: Request, user=Depends(require_login)):
     form = await request.form()
-    pk_id_nuevo = form.get("pkId") or ""
+    pk_id_actual = form.get("pkId") or form.get("currentPkId") or ""
+    items_editados = _items_from_form(form)
     variantes_sel = _variantes_from_form(form)
     extras_nuevos = _extras_from_form(form)
     state = firebase.get_state()
     try:
-        c, recorte = svc.editar_contrato(state, id, form, pk_id_nuevo, variantes_sel, extras_nuevos,
+        c, recorte = svc.editar_contrato(state, id, form, pk_id_actual, items_editados, variantes_sel, extras_nuevos,
                                           user["role"] == "admin", user["email"])
         firebase.save_state(state)
         if recorte:
@@ -243,38 +322,37 @@ def programar_form(id: int, request: Request, user=Depends(require_admin)):
     if not c:
         request.session["flash"] = {"type": "danger", "text": "Contrato no encontrado"}
         return redirect_to("/contratos")
-    req = c.get("requerimientosPersonal") or {r["id"]: 0 for r in ROLES_PERSONAL}
+    req = c.get("personalRequerido") or {r["id"]: 0 for r in ROLES_PERSONAL}
     asign = c.get("personalAsignado") or {}
-    ya_elegidos = {pid for slots in asign.values() for pid in slots}
     bloques = []
     for rol in ROLES_PERSONAL:
-        cupos = req.get(rol["id"], 0)
-        if not cupos:
+        necesarios = int(req.get(rol["id"]) or 0)
+        if not necesarios:
             continue
-        previos = asign.get(rol["id"]) or []
-        slots = []
-        for idx in range(cupos):
-            seleccionado_id = previos[idx] if idx < len(previos) else None
-            candidatos = [p for p in state["personal"] if p["rol"] == rol["id"]]
-            opciones = []
-            for p in candidatos:
-                no_disp = not esta_disponible(p, c["fecha"])
-                ocupado = persona_asignada_en_fecha(state["contratos"], p["id"], c["fecha"], id)
-                elegido_otro = p["id"] in ya_elegidos and seleccionado_id != p["id"]
-                etiqueta = p["nombre"]
-                if no_disp:
-                    etiqueta += " — 🚫 no disponible esta fecha"
-                elif ocupado:
-                    etiqueta += " — ⚠️ ya asignado a otro evento este día"
-                elif elegido_otro:
-                    etiqueta += " — ya elegido arriba"
-                opciones.append({"id": p["id"], "etiqueta": etiqueta,
-                                  "deshabilitado": no_disp or ocupado or elegido_otro,
-                                  "seleccionado": seleccionado_id == p["id"]})
-            slots.append({"idx": idx, "opciones": opciones})
-        bloques.append({"rol": rol, "slots": slots})
+        seleccionados = asign.get(rol["id"]) or []
+        candidatos = sorted((p for p in state["personal"] if p["rol"] == rol["id"]), key=lambda p: p["nombre"] or "")
+        opciones = []
+        for p in candidatos:
+            marcado = p["id"] in seleccionados
+            disponible = esta_disponible(p, c["fecha"])
+            ocupado_en = contratos_ocupado_en_fecha(state["contratos"], p["id"], c["fecha"], id)
+            cupo_lleno = not marcado and len(seleccionados) >= necesarios
+            deshabilitado = not marcado and (not disponible or bool(ocupado_en) or cupo_lleno)
+            motivo = ""
+            if not disponible:
+                motivo = "🚫 Marcado como no disponible esta fecha"
+            elif ocupado_en:
+                motivo = f"⚠️ Ya programado en otro evento ({ocupado_en[0]['cliente']}) este mismo día"
+            elif cupo_lleno:
+                motivo = f"Ya se completó el cupo de {necesarios}"
+            opciones.append({
+                "id": p["id"], "nombre": p["nombre"], "telefono": p.get("telefono"),
+                "marcado": marcado, "deshabilitado": deshabilitado, "motivo": motivo,
+            })
+        bloques.append({"rol": rol, "necesarios": necesarios, "asignados": len(seleccionados), "opciones": opciones})
     return templates.TemplateResponse(request, "programar_personal.html", {
         "user": user, "active_view": "contratos", "c": c, "bloques": bloques,
+        "hora_bodega": fmt_hora_bodega(c), "hora_evento": fmt_hora_evento(c),
     })
 
 
@@ -283,8 +361,8 @@ async def programar_guardar(id: int, request: Request, user=Depends(require_admi
     form = await request.form()
     selecciones = {}
     for rol in ROLES_PERSONAL:
-        vals = form.getlist(f"slot__{rol['id']}")
-        selecciones[rol["id"]] = [int(v) if v else None for v in vals]
+        vals = form.getlist(f"sel__{rol['id']}")
+        selecciones[rol["id"]] = [int(v) for v in vals if v]
     state = firebase.get_state()
     try:
         svc.programar_personal(state, id, selecciones)

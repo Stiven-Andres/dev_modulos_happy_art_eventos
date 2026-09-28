@@ -1,7 +1,10 @@
 """Cálculos del módulo Calendario, portados de renderCalendario()/
-calVerDetalle()/renderReporteMaterialesFecha() en legacy/js/main.js."""
+calVerDetalle()/renderReporteMaterialesFecha()/renderReporteProgramacionFecha()
+(sprint 3) en main.js."""
 import calendar as _cal
 from datetime import date
+
+from app.models import calc_minutos_hora_bodega, fmt_hora_bodega, fmt_hora_evento, resolver_personal_asignado
 
 
 def contar_por_fecha(contratos):
@@ -76,3 +79,22 @@ def reporte_materiales_fecha(productos, eventos_dia):
         detalle.append({"contrato": c, "filas": filas})
 
     return resumen, detalle
+
+
+def reporte_programacion_fecha(personal, eventos_dia):
+    """Hoja de turno del día: eventos ordenados por hora de llegada a bodega
+    (más temprano primero), con el personal ya programado por evento."""
+    def _clave_orden(c):
+        mins = calc_minutos_hora_bodega(c)
+        return (mins is None, mins if mins is not None else 0)
+
+    filas = []
+    for c in sorted(eventos_dia, key=_clave_orden):
+        filas.append({
+            "contrato": c,
+            "hora_bodega": fmt_hora_bodega(c),
+            "hora_evento": fmt_hora_evento(c),
+            "grupos_personal": resolver_personal_asignado(personal, c),
+            "sin_personal": not (c.get("personalAsignado") or {}) or not any((c.get("personalAsignado") or {}).values()),
+        })
+    return filas

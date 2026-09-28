@@ -38,9 +38,10 @@ def ver_calendario(request: Request, user=Depends(require_login), anio: int = 0,
         )
         if eventos_dia:
             resumen, detalle_contratos = svc.reporte_materiales_fecha(state["productos"], eventos_dia)
+            reporte_programacion = svc.reporte_programacion_fecha(state["personal"], eventos_dia)
             detalle = {
                 "fecha": dia, "eventos": eventos_dia, "resumen": resumen,
-                "detalle_contratos": detalle_contratos,
+                "detalle_contratos": detalle_contratos, "reporte_programacion": reporte_programacion,
             }
 
     return templates.TemplateResponse(request, "calendario.html", {
@@ -49,4 +50,16 @@ def ver_calendario(request: Request, user=Depends(require_login), anio: int = 0,
         "semanas": semanas, "conteos": conteos, "hoy_str": hoy_str,
         "prev_mes": prev_mes, "prev_anio": prev_anio, "next_mes": next_mes, "next_anio": next_anio,
         "detalle": detalle, "dia_seleccionado": dia,
+    })
+
+
+@router.get("/calendario/{fecha}/programacion/imprimir")
+def imprimir_programacion(fecha: str, request: Request, user=Depends(require_login)):
+    from app.models import fmt_date
+
+    state = firebase.get_state()
+    eventos_dia = [c for c in state["contratos"] if c.get("fecha") == fecha]
+    reporte = svc.reporte_programacion_fecha(state["personal"], eventos_dia)
+    return templates.TemplateResponse(request, "calendario_imprimir.html", {
+        "fecha": fecha, "fecha_label": fmt_date(fecha + "T12:00:00"), "reporte": reporte,
     })

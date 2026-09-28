@@ -1,10 +1,12 @@
 """Módulo Ventas — registro de un nuevo contrato (selección de empresa,
-paquete, variantes, artículos adicionales y datos del cliente). Portado de
-la vista view-ventas y sus funciones en legacy/js/main.js. Usa fragmentos
-htmx dentro de un único <form> para que la selección de paquete y de extras
-no pierda los demás campos ya digitados (sin estado de sesión: todo el
-estado en curso viaje como inputs — incluidos los ocultos que llenan los
-fragmentos htmx — dentro del propio formulario)."""
+paquete, variantes, ítems editables del paquete, artículos adicionales y
+datos del cliente). Portado de la vista view-ventas y sus funciones en
+legacy/js/main.js + el editor de ítems del paquete y transporte del sprint 3
+(Happy Art.zip). Usa fragmentos htmx dentro de un único <form> para que la
+selección de paquete, la edición de ítems y los extras no pierdan los demás
+campos ya digitados (sin estado de sesión: todo el estado en curso viaja
+como inputs — incluidos los ocultos que llenan los fragmentos htmx — dentro
+del propio formulario)."""
 from fastapi import APIRouter, Depends, Request
 
 from app import firebase
@@ -42,19 +44,49 @@ def _variantes_from_form(form):
     return sel
 
 
+def _items_from_form(form):
+    return [i for i in form.getlist("item_texto")]
+
+
+def _pk_efectivo(pk, items):
+    return {**pk, "items": items} if pk else None
+
+
+async def _panel_ctx(request, form, pk, empresa, items, editando_idx, extras_override=None):
+    state = firebase.get_state()
+    fecha = form.get("fecha") or ""
+    festejado = form.get("festejado") or ""
+    anios = form.get("anios") or ""
+    pk_ef = _pk_efectivo(pk, items)
+    incluidos = svc.incluidos_con_disponibilidad(state["productos"], state["contratos"], pk_ef, fecha) if pk_ef else []
+    pendientes_variante = svc.pendientes_variante_paquete(state["productos"], pk_ef) if pk_ef else []
+    extras = extras_override if extras_override is not None else _extras_from_form(form)
+    extras_full = [{"prod": next((p for p in state["productos"] if p["id"] == e["prodId"]), None), "qty": e["qty"]} for e in extras]
+    return {
+        "empresa": empresa, "pk": pk, "items": items, "items_modificados": bool(pk) and items != pk["items"],
+        "editando_idx": editando_idx, "incluidos": incluidos, "pendientes_variante": pendientes_variante,
+        "extras": extras_full, "fecha": fecha, "festejado": festejado, "anios": anios,
+        "valor_paquete": form.get("valorPaquete") or "",
+        "valor_paquete_raw": pk["precio"] if pk else 0,
+        "transporte": form.get("transporte") or "",
+        "mensajes": [], "faltantes": [],
+    }
+
+
 @router.get("/ventas")
 def ver_ventas(request: Request, user=Depends(require_asesor_o_admin), empresa: str = ""):
     if empresa not in ("happy", "conde"):
         return templates.TemplateResponse(request, "ventas.html", {
             "user": user, "active_view": "ventas", "empresa": "",
         })
-    state = firebase.get_state()
     paquetes_por_cat = {c["id"]: [p for p in PAQUETES if p["categoria"] == c["id"]] for c in svc.CATEGORIAS_PAQUETE}
     return templates.TemplateResponse(request, "ventas.html", {
         "user": user, "active_view": "ventas", "empresa": empresa,
         "categorias": svc.CATEGORIAS_PAQUETE, "paquetes_por_cat": paquetes_por_cat,
-        "pk": None, "incluidos": [], "pendientes_variante": [], "extras": [],
-        "fecha": "", "festejado": "", "anios": "", "valor_paquete": "", "mensajes": [], "faltantes": [],
+        "pk": None, "items": [], "items_modificados": False, "editando_idx": None,
+        "incluidos": [], "pendientes_variante": [], "extras": [],
+        "fecha": "", "festejado": "", "anios": "", "valor_paquete": "", "transporte": "",
+        "mensajes": [], "faltantes": [],
     })
 
 
@@ -62,29 +94,33 @@ def ver_ventas(request: Request, user=Depends(require_asesor_o_admin), empresa: 
 async def seleccionar_paquete(request: Request, user=Depends(require_asesor_o_admin)):
     form = await request.form()
     empresa = form.get("empresa") or "happy"
-    pk_id = form.get("pkId") or form.get("currentPkId") or ""
-    fecha = form.get("fecha") or ""
-    festejado = form.get("festejado") or ""
-    anios = form.get("anios") or ""
+    # pkId (explícito, de un click en una tarjeta de paquete) = selección NUEVA,
+    # que reinicia los ítems editados. Si no viene, es solo un refresco (p.ej.
+    # al cambiar la fecha) del mismo paquete ya elegido (currentPkId): se
+    # conservan los ítems tal como estaban.
+    pk_id_nuevo = form.get("pkId") or ""
+    pk_id = pk_id_nuevo or form.get("currentPkId") or ""
     state = firebase.get_state()
     pk = svc.get_paquete(pk_id)
 
-    extras, mensajes, faltantes = ([], [], [])
-    if pk:
-        incluidos = svc.incluidos_con_disponibilidad(state["productos"], state["contratos"], pk, fecha)
-        pendientes_variante = svc.pendientes_variante_paquete(state["productos"], pk)
-        extras, mensajes, faltantes = svc.detectar_letras_numero(state["productos"], pk, festejado, anios)
+    mensajes, faltantes = [], []
+    if pk_id_nuevo:
+        items = list(pk["items"]) if pk else []
+        extras, mensajes, faltantes = svc.detectar_letras_numero(
+            state["productos"], pk, form.get("festejado") or "", form.get("anios") or "") if pk else ([], [], [])
     else:
-        incluidos, pendientes_variante = [], []
+        # Solo un refresco (ej. cambió la fecha): conservar ítems y extras tal como estaban.
+        items = _items_from_form(form) or (list(pk["items"]) if pk else [])
+        extras_auto, mensajes, faltantes = svc.detectar_letras_numero(
+            state["productos"], pk, form.get("festejado") or "", form.get("anios") or "") if pk else ([], [], [])
+        manuales = [e for e in _extras_from_form(form) if not any(a["prodId"] == e["prodId"] for a in extras_auto)]
+        extras = extras_auto + manuales
 
-    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", {
-        "empresa": empresa, "pk": pk, "incluidos": incluidos, "pendientes_variante": pendientes_variante,
-        "extras": [{"prod": next((p for p in state["productos"] if p["id"] == e["prodId"]), None), "qty": e["qty"]} for e in extras],
-        "fecha": fecha, "festejado": festejado, "anios": anios,
-        "valor_paquete": fmt_precio(pk["precio"]).replace("$", "") if pk else "",
-        "valor_paquete_raw": pk["precio"] if pk else 0,
-        "mensajes": mensajes, "faltantes": faltantes,
-    })
+    ctx = await _panel_ctx(request, form, pk, empresa, items, None, extras_override=extras)
+    ctx["mensajes"], ctx["faltantes"] = mensajes, faltantes
+    if pk_id_nuevo:
+        ctx["valor_paquete"] = "" if (pk and pk.get("categoria") == "personalizado") else (fmt_precio(pk["precio"]).replace("$", "") if pk else "")
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
 
 
 @router.post("/ventas/detectar")
@@ -92,25 +128,73 @@ async def detectar(request: Request, user=Depends(require_asesor_o_admin)):
     form = await request.form()
     empresa = form.get("empresa") or "happy"
     pk_id = form.get("currentPkId") or form.get("pkId") or ""
-    fecha = form.get("fecha") or ""
-    festejado = form.get("festejado") or ""
-    anios = form.get("anios") or ""
     state = firebase.get_state()
     pk = svc.get_paquete(pk_id)
-    incluidos = svc.incluidos_con_disponibilidad(state["productos"], state["contratos"], pk, fecha) if pk else []
-    pendientes_variante = svc.pendientes_variante_paquete(state["productos"], pk) if pk else []
-    extras_auto, mensajes, faltantes = svc.detectar_letras_numero(state["productos"], pk, festejado, anios) if pk else ([], [], [])
+    items = _items_from_form(form) or (list(pk["items"]) if pk else [])
 
+    extras_auto, mensajes, faltantes = svc.detectar_letras_numero(
+        state["productos"], pk, form.get("festejado") or "", form.get("anios") or "") if pk else ([], [], [])
     manuales = [e for e in _extras_from_form(form) if not any(a["prodId"] == e["prodId"] for a in extras_auto)]
     extras = extras_auto + manuales
 
-    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", {
-        "empresa": empresa, "pk": pk, "incluidos": incluidos, "pendientes_variante": pendientes_variante,
-        "extras": [{"prod": next((p for p in state["productos"] if p["id"] == e["prodId"]), None), "qty": e["qty"]} for e in extras],
-        "fecha": fecha, "festejado": festejado, "anios": anios,
-        "valor_paquete": form.get("valorPaquete") or "", "valor_paquete_raw": pk["precio"] if pk else 0,
-        "mensajes": mensajes, "faltantes": faltantes,
-    })
+    ctx = await _panel_ctx(request, form, pk, empresa, items, None, extras_override=extras)
+    ctx["mensajes"], ctx["faltantes"] = mensajes, faltantes
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
+
+
+# ── Editor de ítems del paquete (editar texto / quitar / restablecer) ──────
+
+@router.post("/ventas/item/editar")
+async def item_editar(request: Request, user=Depends(require_asesor_o_admin)):
+    form = await request.form()
+    pk = svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    ctx = await _panel_ctx(request, form, pk, form.get("empresa") or "happy", items, idx)
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
+
+
+@router.post("/ventas/item/guardar")
+async def item_guardar(request: Request, user=Depends(require_asesor_o_admin)):
+    form = await request.form()
+    pk = svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    nuevo = (form.get("item_edit_texto") or "").strip()
+    if nuevo and 0 <= idx < len(items):
+        items[idx] = nuevo
+    ctx = await _panel_ctx(request, form, pk, form.get("empresa") or "happy", items, None)
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
+
+
+@router.post("/ventas/item/cancelar")
+async def item_cancelar(request: Request, user=Depends(require_asesor_o_admin)):
+    form = await request.form()
+    pk = svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    ctx = await _panel_ctx(request, form, pk, form.get("empresa") or "happy", items, None)
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
+
+
+@router.post("/ventas/item/quitar")
+async def item_quitar(request: Request, user=Depends(require_asesor_o_admin)):
+    form = await request.form()
+    pk = svc.get_paquete(form.get("currentPkId") or "")
+    items = _items_from_form(form)
+    idx = int(form.get("idx"))
+    if 0 <= idx < len(items):
+        items.pop(idx)
+    ctx = await _panel_ctx(request, form, pk, form.get("empresa") or "happy", items, None)
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
+
+
+@router.post("/ventas/item/restablecer")
+async def item_restablecer(request: Request, user=Depends(require_asesor_o_admin)):
+    form = await request.form()
+    pk = svc.get_paquete(form.get("currentPkId") or "")
+    items = list(pk["items"]) if pk else []
+    ctx = await _panel_ctx(request, form, pk, form.get("empresa") or "happy", items, None)
+    return templates.TemplateResponse(request, "partials/venta_paquete_panel.html", ctx)
 
 
 @router.get("/ventas/extras/buscar")
@@ -169,9 +253,11 @@ async def registrar(request: Request, user=Depends(require_asesor_o_admin)):
     pk_id = form.get("pkId") or form.get("currentPkId") or ""
     variantes_sel = _variantes_from_form(form)
     extras_sel = _extras_from_form(form)
+    items_editados = _items_from_form(form)
     state = firebase.get_state()
     try:
-        contrato = svc.registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, user["email"])
+        contrato = svc.registrar_contrato(state, empresa, pk_id, form, variantes_sel, extras_sel, user["email"],
+                                           items_editados=items_editados)
         firebase.save_state(state)
         request.session["flash"] = {"type": "success", "text": f"✅ Venta registrada · contrato creado con {len(contrato['items'])} artículo(s)"}
         return redirect_to(f"/contratos?recien_creado={contrato['id']}")

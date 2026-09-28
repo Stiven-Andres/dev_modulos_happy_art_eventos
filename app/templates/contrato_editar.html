@@ -31,7 +31,7 @@
         hx-post="/contratos/{{ c.id }}/paquete-panel" hx-include="closest form" hx-vals='{"pkId": "{{ p.id }}"}' hx-target="#paquete-panel">
         <div class="fw-bold small">{{ p.nombreHappy if c.empresa=='happy' else p.nombreConde }}</div>
         <div class="text-muted" style="font-size:10px;">{{ p.nombreConde if c.empresa=='happy' else p.nombreHappy }}</div>
-        <div class="fw-bold small mt-1">{{ fmt_precio(p.precio) }}</div>
+        <div class="fw-bold small mt-1">{{ 'A definir' if p.categoria == 'personalizado' else fmt_precio(p.precio) }}</div>
       </button>
     </div>
     {% endfor %}
@@ -42,11 +42,6 @@
 
 <div id="paquete-panel">
   {% include "partials/contrato_paquete_panel.html" %}
-</div>
-
-<div class="mt-3" style="max-width:280px;">
-  <label class="form-label">💰 Valor del paquete <span class="small text-muted">(edítalo solo si aplica un precio diferente)</span></label>
-  <input type="text" name="valorPaquete" class="form-control" value="{{ fmt(c.valor) }}" inputmode="numeric">
 </div>
 
 <div class="mt-4">
@@ -79,11 +74,11 @@
 
 <div class="mt-4">
   <div class="fw-bold mb-2">👥 Personal necesario para el evento</div>
-  {% set req = c.requerimientosPersonal or {} %}
+  {% set req = c.personalRequerido or {} %}
   <div class="row g-3">
-    <div class="col-md-3"><label class="form-label">🚚 Logísticos</label><input type="number" min="0" name="pers_logistico" value="{{ req.logistico or 0 }}" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🧰 Logísticos</label><input type="number" min="0" name="pers_logistico" value="{{ req.logistico or 0 }}" class="form-control"></div>
     <div class="col-md-3"><label class="form-label">🎭 Recreadores</label><input type="number" min="0" name="pers_recreador" value="{{ req.recreador or 0 }}" class="form-control"></div>
-    <div class="col-md-3"><label class="form-label">🧭 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="{{ req.coordinador or 0 }}" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🎯 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="{{ req.coordinador or 0 }}" class="form-control"></div>
     <div class="col-md-3"><label class="form-label">🔧 Operarios</label><input type="number" min="0" name="pers_operario" value="{{ req.operario or 0 }}" class="form-control"></div>
   </div>
 </div>

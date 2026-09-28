@@ -3,10 +3,27 @@
 <div class="venta-section fw-bold mt-3">🎉 {{ pk.nombreHappy if empresa=='happy' else pk.nombreConde }}</div>
 
 <div class="mb-2" style="max-width:260px;">
-  <label class="form-label">💰 Valor del paquete</label>
-  <input type="text" class="form-control" name="valorPaquete" value="{{ valor_paquete }}" inputmode="numeric">
-  <div class="form-text">Catálogo: {{ fmt_precio(valor_paquete_raw) if valor_paquete_raw else '' }}</div>
+  <label class="form-label">💰 Valor del paquete{% if pk.categoria == 'personalizado' %} <span class="text-danger">*</span>{% endif %}</label>
+  <input type="text" class="form-control" name="valorPaquete" id="v_valor_paquete" value="{{ valor_paquete }}" inputmode="numeric"
+    placeholder="{{ 'Ingresa el valor acordado' if pk.categoria == 'personalizado' else '' }}" oninput="ventaActualizarTotal()">
+  {% if valor_paquete_raw %}<div class="form-text">Catálogo: {{ fmt_precio(valor_paquete_raw) }}</div>{% endif %}
 </div>
+<div class="mb-2" style="max-width:260px;">
+  <label class="form-label">🚐 Transporte intermunicipal <span class="small text-muted fw-normal">(solo si aplica)</span></label>
+  <input type="text" class="form-control" name="transporte" id="v_transporte" value="{{ transporte }}" inputmode="numeric" placeholder="0" oninput="ventaActualizarTotal()">
+  <div class="form-text" id="v_total_preview" style="display:none;"></div>
+</div>
+<script>
+function ventaActualizarTotal(){
+  var t = parseInt((document.getElementById('v_transporte').value||'').replace(/[^0-9]/g,'')) || 0;
+  var box = document.getElementById('v_total_preview');
+  if(t <= 0){ box.style.display='none'; return; }
+  var v = parseInt((document.getElementById('v_valor_paquete').value||'').replace(/[^0-9]/g,'')) || {{ valor_paquete_raw or 0 }};
+  box.style.display='block';
+  box.textContent = 'Valor del paquete que verá el cliente en el contrato: $' + (v+t).toLocaleString('es-CO');
+}
+ventaActualizarTotal();
+</script>
 
 {% if mensajes or faltantes %}
 <div class="alert alert-info py-2 small">
@@ -15,13 +32,38 @@
 </div>
 {% endif %}
 
-<div class="small fw-bold text-uppercase text-muted mt-2">✅ Incluido en el paquete</div>
-<ul class="small">
-  {% for i in incluidos %}
-  <li>{{ i.texto }}
-    {% if i.estado == 'sin_stock' %}<span class="text-danger fw-bold">⚠️ sin stock esa fecha</span>
-    {% elif i.estado == 'bajo' %}<span class="text-warning fw-bold">⚠️ stock bajo</span>{% endif %}
+<div class="d-flex align-items-center justify-content-between mt-2">
+  <div class="small fw-bold text-uppercase text-muted">✅ Incluido en el paquete <span class="fw-normal text-lowercase">(quita o cambia lo que no aplique)</span></div>
+  {% if items_modificados %}
+  <button type="button" class="btn btn-sm btn-outline-secondary" hx-post="/ventas/item/restablecer" hx-include="closest form" hx-target="#paquete-panel">↺ Restablecer</button>
+  {% endif %}
+</div>
+<ul class="list-group list-group-flush mb-2">
+  {% for item in items %}
+  <li class="list-group-item px-2">
+    {% if loop.index0 == editando_idx %}
+    <div class="d-flex gap-2">
+      <input type="text" class="form-control form-control-sm" name="item_edit_texto" value="{{ item }}" autofocus>
+      <button type="button" class="btn btn-sm btn-primary" hx-post="/ventas/item/guardar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Guardar">✔</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" hx-post="/ventas/item/cancelar" hx-include="closest form" hx-target="#paquete-panel" title="Cancelar">✕</button>
+    </div>
+    {% else %}
+    <div class="d-flex justify-content-between align-items-center gap-2">
+      <span class="small">{{ item }}
+        {% set inc = incluidos[loop.index0] if loop.index0 < incluidos|length else None %}
+        {% if inc and inc.estado == 'sin_stock' %}<span class="text-danger fw-bold">⚠️ sin stock esa fecha</span>
+        {% elif inc and inc.estado == 'bajo' %}<span class="text-warning fw-bold">⚠️ stock bajo</span>{% endif %}
+      </span>
+      <span class="flex-shrink-0">
+        <button type="button" class="btn btn-sm btn-link p-0 me-2" hx-post="/ventas/item/editar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Editar">✏️</button>
+        <button type="button" class="btn btn-sm btn-link text-danger p-0" hx-post="/ventas/item/quitar" hx-include="closest form" hx-vals='{"idx": {{ loop.index0 }}}' hx-target="#paquete-panel" title="Quitar">✕</button>
+      </span>
+    </div>
+    {% endif %}
+    <input type="hidden" name="item_texto" value="{{ item }}">
   </li>
+  {% else %}
+  <li class="list-group-item px-2 text-muted small fst-italic">Sin ítems por ahora — agrégalos desde "Artículos adicionales" más abajo.</li>
   {% endfor %}
 </ul>
 

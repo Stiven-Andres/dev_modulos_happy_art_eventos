@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Programación {{ fecha_label }}</title>
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:24px;}
+  h1{font-size:17px;margin-bottom:2px;}
+  .sub{color:#666;font-size:11px;margin-bottom:16px;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#eef1f5;text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#777;}
+  td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:top;}
+  tr:nth-child(even) td{background:#fafafa;}
+  .print-btn{margin-bottom:16px;}
+  @media print{ body{padding:0;} .print-btn{display:none;} }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+<h1>👷 Reporte de programación de personal</h1>
+<div class="sub">Fecha: {{ fecha_label }} · El personal debe estar en bodega 3 horas antes del inicio más temprano del evento.</div>
+<table>
+  <thead><tr><th>Hora en bodega</th><th>Personal</th><th>Cliente</th><th>Dirección del evento</th><th>Paquete / hora evento</th></tr></thead>
+  <tbody>
+    {% for f in reporte %}
+    {% set c = f.contrato %}
+    <tr>
+      <td style="font-weight:bold;white-space:nowrap;">{{ f.hora_bodega }}</td>
+      <td>
+        {% if f.grupos_personal %}
+          {% for g in f.grupos_personal %}{{ g.label }}: {{ g.nombres|join(', ') }}{% if not loop.last %} · {% endif %}{% endfor %}
+        {% else %}
+          <em>Sin personal asignado</em>
+        {% endif %}
+      </td>
+      <td><strong>{{ c.cliente }}</strong><br><small>Festejado: {{ c.festejado or '—' }} · {{ 'Conde Eventos' if c.empresa=='conde' else 'Happy Art Eventos' }}</small></td>
+      <td>{{ c.direccion or '—' }}{% if c.barrio %}, {{ c.barrio }}{% endif %}{% if c.localidad %} · {{ c.localidad }}{% endif %}</td>
+      <td>{{ c.paquete }}<br><small>⏰ {{ f.hora_evento or '—' }}</small></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="text-align:center;color:#888;">Sin eventos para esta fecha</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</body>
+</html>

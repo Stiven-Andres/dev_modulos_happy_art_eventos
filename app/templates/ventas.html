@@ -53,7 +53,7 @@
         hx-post="/ventas/paquete" hx-include="closest form" hx-vals='{"pkId": "{{ p.id }}"}' hx-target="#paquete-panel">
         <div class="fw-bold small">{{ p.nombreHappy if empresa=='happy' else p.nombreConde }}</div>
         <div class="text-muted" style="font-size:10px;">{{ p.nombreConde if empresa=='happy' else p.nombreHappy }}</div>
-        <div class="fw-bold small mt-1" style="color:{{ '#ff6b35' if empresa=='happy' else '#6f42c1' }};">{{ fmt_precio(p.precio) }}</div>
+        <div class="fw-bold small mt-1" style="color:{{ '#ff6b35' if empresa=='happy' else '#6f42c1' }};">{{ 'A definir' if p.categoria == 'personalizado' else fmt_precio(p.precio) }}</div>
       </button>
     </div>
     {% endfor %}
@@ -69,9 +69,9 @@
 <div class="mt-4">
   <div class="fw-bold mb-2">👥 Personal necesario para el evento</div>
   <div class="row g-3">
-    <div class="col-md-3"><label class="form-label">🚚 Logísticos</label><input type="number" min="0" name="pers_logistico" value="0" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🧰 Logísticos</label><input type="number" min="0" name="pers_logistico" value="0" class="form-control"></div>
     <div class="col-md-3"><label class="form-label">🎭 Recreadores</label><input type="number" min="0" name="pers_recreador" value="0" class="form-control"></div>
-    <div class="col-md-3"><label class="form-label">🧭 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="0" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label">🎯 Coordinadores</label><input type="number" min="0" name="pers_coordinador" value="0" class="form-control"></div>
     <div class="col-md-3"><label class="form-label">🔧 Operarios</label><input type="number" min="0" name="pers_operario" value="0" class="form-control"></div>
   </div>
 </div>
