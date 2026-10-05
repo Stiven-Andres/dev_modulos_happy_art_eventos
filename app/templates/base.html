@@ -29,11 +29,13 @@
         <a class="nav-link {{ 'active' if active_view=='prestamos' }}" href="/prestamos">🔄 Préstamos</a>
         <a class="nav-link {{ 'active' if active_view=='ventas' }}" href="/ventas">🛒 Nueva Venta</a>
         <a class="nav-link {{ 'active' if active_view=='contratos' }}" href="/contratos">📄 Contratos</a>
+        <a class="nav-link {{ 'active' if active_view=='comisiones' }}" href="/comisiones">💰 Comisiones</a>
         <a class="nav-link {{ 'active' if active_view=='alertas' }}" href="/alertas">⚠️ Alertas</a>
       {% elif user.role == 'asesor' %}
         <a class="nav-link {{ 'active' if active_view=='calendario' }}" href="/calendario">📅 Calendario</a>
         <a class="nav-link {{ 'active' if active_view=='ventas' }}" href="/ventas">🛒 Nueva Venta</a>
         <a class="nav-link {{ 'active' if active_view=='contratos' }}" href="/contratos">📄 Contratos</a>
+        <a class="nav-link {{ 'active' if active_view=='comisiones' }}" href="/comisiones">💰 Comisiones</a>
       {% else %}
         <a class="nav-link {{ 'active' if active_view=='productos' }}" href="/inventario">📦 Inventario</a>
         <a class="nav-link {{ 'active' if active_view=='calendario' }}" href="/calendario">📅 Calendario</a>

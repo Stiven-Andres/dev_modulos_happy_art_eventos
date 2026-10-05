@@ -339,6 +339,64 @@ def fmt_fecha_contrato(date_str):
     return f"{int(d)} DE {_MESES_LARGOS[int(m) - 1]} {y}"
 
 
+# ── Comisiones de asesores (10% del valor del paquete, sin transporte) ──────
+# Nada de esto se guarda en Firebase: se calcula al vuelo a partir de
+# state["contratos"], portado de la sección COMISIONES de legacy/js/models.js
+# y legacy/js/operations.js.
+COMISION_PORCENTAJE = 0.10
+
+
+def comision_contrato(c):
+    return round((float(c.get("valor") or 0)) * COMISION_PORCENTAJE)
+
+
+def usuario_asesor(email):
+    """'brayang@asesoreventos.com' -> 'brayang'"""
+    return str(email or "").split("@")[0]
+
+
+def fecha_venta_contrato(c):
+    """Fecha en que se VENDIÓ el contrato (cuando el asesor lo registró). Si
+    algún contrato antiguo no tiene fechaRegistro, se usa la fecha del evento
+    como respaldo."""
+    from datetime import datetime
+
+    if c.get("fechaRegistro"):
+        return datetime.fromtimestamp(c["fechaRegistro"] / 1000).date()
+    if c.get("fecha"):
+        y, m, d = c["fecha"].split("-")
+        return datetime(int(y), int(m), int(d)).date()
+    return None
+
+
+def fecha_evento_contrato(c):
+    """Fecha en que SE REALIZA el evento (c.fecha), distinta de la fecha de
+    venta: se usa para saber en qué mes/quincena cae el evento."""
+    from datetime import datetime
+
+    if c.get("fecha"):
+        y, m, d = c["fecha"].split("-")
+        return datetime(int(y), int(m), int(d)).date()
+    return None
+
+
+def quincena_de_fecha(fecha):
+    """1 = evento entre el día 1 y el 14 del mes; 2 = entre el 15 y el fin."""
+    return 1 if fecha.day <= 14 else 2
+
+
+def evento_realizado(c, ahora=None):
+    """¿Ya pasó la fecha del evento? Se valida contra la fecha actual,
+    comparando solo el día, para que un evento "hoy" cuente como realizado."""
+    from datetime import date
+
+    f = fecha_evento_contrato(c)
+    if not f:
+        return False
+    hoy = ahora or date.today()
+    return f <= hoy
+
+
 def fmt_hora(time_str):
     if not time_str:
         return ""

@@ -12,6 +12,7 @@ from app.routers import (
     alertas,
     auth,
     calendario,
+    comisiones,
     contratos,
     dashboard,
     inventario,
@@ -36,6 +37,7 @@ app.include_router(prestamos.router)
 app.include_router(ventas.router)
 app.include_router(contratos.router)
 app.include_router(alertas.router)
+app.include_router(comisiones.router)
 
 
 @app.get("/")

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Comisiones — EventStock{% endblock %}
+{% block content %}
+<h3 class="fw-bold mb-1">Comisiones 💰</h3>
+<div class="small text-muted mb-3">{{ (COMISION_PORCENTAJE*100)|round|int }}% del valor del paquete vendido (sin transporte intermunicipal)</div>
+
+{% if user.role == 'asesor' %}
+<div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+  <div class="col"><div class="card text-bg-warning-subtle h-100"><div class="card-body"><div>📅</div><div class="small">Esta semana</div><div class="fs-4 fw-bold">${{ fmt(semana_actual.comision if semana_actual else 0) }}</div><div class="small">{{ semana_actual.n if semana_actual else 0 }} evento(s) vendido(s)</div></div></div></div>
+  <div class="col"><div class="card text-white h-100" style="background:#6f42c1;"><div class="card-body"><div>🗓️</div><div class="small">{{ rotulo_mes(mes_actual) }}</div><div class="fs-4 fw-bold">${{ fmt(mi_mes.comision) }}</div><div class="small">{{ mi_mes.n }} evento(s) vendido(s)</div></div></div></div>
+  <div class="col"><div class="card text-bg-success h-100"><div class="card-body"><div>💰</div><div class="small">Total acumulado</div><div class="fs-4 fw-bold">${{ fmt(total_acumulado) }}</div><div class="small">comisión {{ (COMISION_PORCENTAJE*100)|round|int }}%</div></div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header fw-bold">📅 Mis comisiones por semana</div>
+  <div class="card-body">
+    <div class="small text-muted mb-3">Semanas de lunes a domingo, según la fecha en que registraste cada venta. Abre una semana para ver sus contratos.</div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Semana</th><th>Eventos vendidos</th><th>Ventas (valor de paquetes)</th><th>Comisión ({{ (COMISION_PORCENTAJE*100)|round|int }}%)</th></tr></thead>
+        <tbody>
+          {% for sem in semanas %}
+          <tr {{ 'class=table-warning' if semana_actual and sem.clave==semana_actual.clave }}>
+            <td>
+              {% if sem.n %}
+              <details>
+                <summary>{{ rotulo_semana(sem.inicio, sem.fin) }}{% if semana_actual and sem.clave==semana_actual.clave %} <span class="badge text-bg-warning">esta semana</span>{% endif %}</summary>
+                <div class="mt-2 ps-2 border-start">
+                  {% for k in sem.contratos %}
+                  <div class="d-flex justify-content-between gap-3 small py-1">
+                    <span><strong>{{ k.cliente }}</strong> · {{ k.paquete }} <span class="text-muted">({{ k.fechaVenta.day }} {{ meses_cortos[k.fechaVenta.month-1] }})</span></span>
+                    <span>${{ fmt(k.valor) }} → <strong>${{ fmt(k.comision) }}</strong></span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </details>
+              {% else %}
+              {{ rotulo_semana(sem.inicio, sem.fin) }}{% if semana_actual and sem.clave==semana_actual.clave %} <span class="badge text-bg-warning">esta semana</span>{% endif %}
+              {% endif %}
+            </td>
+            <td>{{ sem.n }}</td>
+            <td>${{ fmt(sem.ventas) }}</td>
+            <td class="fw-bold">${{ fmt(sem.comision) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="fw-bold table-light">
+            <td>Total</td>
+            <td>{{ semanas|sum(attribute='n') }}</td>
+            <td>${{ fmt(semanas|sum(attribute='ventas')) }}</td>
+            <td>${{ fmt(total_acumulado) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <span class="fw-bold">🏆 Ranking de asesores</span>
+      <div class="small text-muted">Eventos vendidos y comisión total del mes</div>
+    </div>
+    <form method="get" action="/comisiones">
+      <select name="mes" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for m in meses %}<option value="{{ m }}" {{ 'selected' if m==mes_sel }}>{{ rotulo_mes(m) }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>#</th><th>Asesor</th><th>Eventos del mes</th><th>Realizados 01–14</th><th>Realizados 15–fin</th><th>Comisión total del mes</th></tr></thead>
+      <tbody>
+        {% for r in ranking %}
+        <tr {{ 'class=table-warning' if r.email==email_actual }}>
+          <td class="text-center fw-bold">{{ ['🥇','🥈','🥉'][loop.index0] if r.n>0 and loop.index0<3 else loop.index }}</td>
+          <td>{{ r.usuario }}{% if r.email==email_actual %} <span class="badge text-bg-secondary">tú</span>{% endif %}</td>
+          <td>{{ r.n }}</td>
+          <td>{{ (r.q1n ~ ' · $' ~ fmt(r.q1comision)) if r.q1n else '—' }}</td>
+          <td>{{ (r.q2n ~ ' · $' ~ fmt(r.q2comision)) if r.q2n else '—' }}</td>
+          <td class="fw-bold">${{ fmt(r.comision) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-3">Aún no hay asesores registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if user.role == 'admin' %}
+<div class="card mb-4">
+  <div class="card-header">
+    <span class="fw-bold">🗓️ Validación de quincenas</span>
+    <div class="small text-muted">Según el calendario y la fecha de hoy: valida qué eventos del mes ya se realizaron (01–14 y 15–fin de mes) para pagar la comisión correspondiente.</div>
+  </div>
+  <div class="card-body">
+    {% for titulo, resumen, lista in [('📅 Del 1 al 14', quincenas.resumenQ1, quincenas.q1), ('📅 Del 15 al fin de mes', quincenas.resumenQ2, quincenas.q2)] %}
+    <div class="mb-4">
+      <div class="fw-bold small mb-2">{{ titulo }} <span class="text-muted fw-normal">· {{ resumen.realizados }}/{{ resumen.total }} realizados{% if resumen.pendientes %} · {{ resumen.pendientes }} pendiente(s){% endif %}</span></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Fecha</th><th>Cliente</th><th>Asesor</th><th>Comisión</th><th>Estado</th></tr></thead>
+          <tbody>
+            {% for it in lista %}
+            <tr>
+              <td>{{ it.fecha.day }} {{ meses_cortos[it.fecha.month-1] }}</td>
+              <td>{{ it.cliente }}</td>
+              <td>{{ it.asesor }}</td>
+              <td>${{ fmt(it.comision) }}</td>
+              <td>{% if it.realizado %}<span class="text-success fw-bold">✅ Realizado</span>{% else %}<span class="text-muted">⏳ Pendiente</span>{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Sin eventos en este periodo.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

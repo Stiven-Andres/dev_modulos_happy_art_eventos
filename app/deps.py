@@ -8,6 +8,7 @@ from starlette.responses import RedirectResponse
 from starlette.status import HTTP_303_SEE_OTHER
 
 from app import models
+from app.services import comisiones
 
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["fmt"] = models.fmt
@@ -27,6 +28,9 @@ templates.env.globals["calc_minutos_hora_bodega"] = models.calc_minutos_hora_bod
 templates.env.globals["ROLES_PERSONAL"] = models.ROLES_PERSONAL
 templates.env.globals["ROLES_PERSONAL_STAFF"] = models.ROLES_PERSONAL_STAFF
 templates.env.globals["CUENTAS_PAGO"] = models.CUENTAS_PAGO
+templates.env.globals["COMISION_PORCENTAJE"] = models.COMISION_PORCENTAJE
+templates.env.globals["rotulo_mes"] = comisiones.rotulo_mes
+templates.env.globals["rotulo_semana"] = comisiones.rotulo_semana
 
 
 class RedirectToLogin(Exception):
