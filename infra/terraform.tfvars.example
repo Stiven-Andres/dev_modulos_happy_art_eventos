@@ -1,0 +1,16 @@
+# Copia este archivo a terraform.tfvars y rellena los valores reales.
+# terraform.tfvars NUNCA debe subirse a git (ya está en .gitignore).
+
+github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Contenido COMPLETO del JSON de la cuenta de servicio de Firebase, en una
+# sola línea (puedes generarlo con: cat cuenta-servicio.json | tr -d '\n')
+firebase_service_account_json = "{\"type\": \"service_account\", ...}"
+
+# Generar con: python3 -c "import secrets; print(secrets.token_hex(32))"
+session_secret_key = "pega-aqui-el-valor-generado"
+
+# Opcional — valores por defecto ya definidos en variables.tf:
+# aws_region    = "us-east-1"
+# instance_type = "t3.micro"
+# repo_branch   = "master"

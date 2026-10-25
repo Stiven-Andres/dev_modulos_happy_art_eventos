@@ -4,3 +4,10 @@ __pycache__/
 venv/
 *.env
 .env
+
+# Terraform (infra/) — nunca versionar estado ni secretos
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/*.tfplan
