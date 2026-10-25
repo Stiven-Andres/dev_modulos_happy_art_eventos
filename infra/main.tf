@@ -12,6 +12,8 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
 # ---------------------------------------------------------------------------
 # AMI: última Ubuntu 22.04 LTS oficial de Canonical
 # ---------------------------------------------------------------------------
@@ -68,7 +70,33 @@ resource "aws_security_group" "eventstock" {
 }
 
 # ---------------------------------------------------------------------------
-# IAM: rol para que la instancia pueda ser administrada por SSM
+# S3: bucket privado donde se sube el .zip con el código de la app.
+# La instancia lo descarga al arrancar (en vez de clonar desde GitHub).
+# ---------------------------------------------------------------------------
+resource "aws_s3_bucket" "app_code" {
+  bucket = "eventstock-app-code-${data.aws_caller_identity.current.account_id}"
+  tags   = { Project = "EventStock" }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_code" {
+  bucket = aws_s3_bucket.app_code.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_object" "app_code" {
+  bucket = aws_s3_bucket.app_code.id
+  key    = "app.zip"
+  source = var.app_zip_path
+  etag   = filemd5(var.app_zip_path)
+}
+
+# ---------------------------------------------------------------------------
+# IAM: rol para que la instancia pueda ser administrada por SSM y pueda
+# descargar el .zip del código desde el bucket S3 anterior.
 # ---------------------------------------------------------------------------
 resource "aws_iam_role" "ssm_role" {
   name = "eventstock-ssm-role"
@@ -90,6 +118,20 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy" "s3_read_app_code" {
+  name = "eventstock-s3-read-app-code"
+  role = aws_iam_role.ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject"]
+      Resource = "${aws_s3_bucket.app_code.arn}/${aws_s3_object.app_code.key}"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "ssm_profile" {
   name = "eventstock-ssm-profile"
   role = aws_iam_role.ssm_role.name
@@ -105,9 +147,9 @@ resource "aws_instance" "eventstock" {
   vpc_security_group_ids = [aws_security_group.eventstock.id]
 
   user_data = templatefile("${path.module}/templates/user_data.sh.tpl", {
-    repo_url_https_no_scheme          = var.repo_url_https_no_scheme
-    repo_branch                       = var.repo_branch
-    github_token                      = var.github_token
+    aws_region                        = var.aws_region
+    s3_bucket                         = aws_s3_bucket.app_code.id
+    s3_key                            = aws_s3_object.app_code.key
     firebase_service_account_json_b64 = base64encode(var.firebase_service_account_json)
     session_secret_key                = var.session_secret_key
     app_environment                   = var.app_environment

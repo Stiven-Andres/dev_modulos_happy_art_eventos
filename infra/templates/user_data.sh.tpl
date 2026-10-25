@@ -12,17 +12,29 @@ export DEBIAN_FRONTEND=noninteractive
 # ---------------------------------------------------------------------------
 apt-get update -y
 apt-get install -y \
-  python3 python3-venv python3-pip git nginx \
+  python3 python3-venv python3-pip awscli unzip nginx \
   libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
   libgdk-pixbuf2.0-0 libffi-dev shared-mime-info fonts-liberation
 
 # ---------------------------------------------------------------------------
-# 2. Código de la aplicación
+# 2. Código de la aplicación (descargado desde S3, no clonado de GitHub)
 # ---------------------------------------------------------------------------
 APP_DIR=/opt/eventstock
-rm -rf "$APP_DIR"
-git clone --branch "${repo_branch}" --depth 1 \
-  "https://${github_token}@${repo_url_https_no_scheme}" "$APP_DIR"
+rm -rf "$APP_DIR" /tmp/app.zip /tmp/app_extracted
+mkdir -p "$APP_DIR" /tmp/app_extracted
+
+aws s3 cp "s3://${s3_bucket}/${s3_key}" /tmp/app.zip --region "${aws_region}"
+unzip -q /tmp/app.zip -d /tmp/app_extracted
+
+# Si el .zip contiene una sola carpeta raíz (ej. "happy-art-eventos_desarrollo/"),
+# usamos su contenido; si no, usamos la raíz extraída directamente.
+SRC_DIR=/tmp/app_extracted
+ENTRIES=$(find /tmp/app_extracted -mindepth 1 -maxdepth 1)
+if [ "$(echo "$ENTRIES" | wc -l)" -eq 1 ] && [ -d "$ENTRIES" ]; then
+  SRC_DIR="$ENTRIES"
+fi
+cp -r "$SRC_DIR"/. "$APP_DIR"/
+rm -rf /tmp/app.zip /tmp/app_extracted
 
 cd "$APP_DIR"
 python3 -m venv venv

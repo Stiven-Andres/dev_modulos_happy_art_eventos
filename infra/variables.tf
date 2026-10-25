@@ -10,22 +10,9 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "repo_url_https_no_scheme" {
-  description = "Repositorio de GitHub sin el esquema https://, ej. github.com/usuario/repo.git"
+variable "app_zip_path" {
+  description = "Ruta local (en la máquina donde corres Terraform) al .zip con el código de la app a desplegar. Terraform lo sube a S3 y la instancia lo descarga al arrancar."
   type        = string
-  default     = "github.com/BryanG03036/happy-art-eventos_desarrollo.git"
-}
-
-variable "repo_branch" {
-  description = "Rama a desplegar."
-  type        = string
-  default     = "master"
-}
-
-variable "github_token" {
-  description = "Token de acceso personal de GitHub con permiso de lectura (Contents: Read-only) sobre el repositorio privado. NUNCA lo pongas en este archivo .tf; va en terraform.tfvars (no versionado)."
-  type        = string
-  sensitive   = true
 }
 
 variable "firebase_service_account_json" {

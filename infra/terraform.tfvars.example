@@ -1,7 +1,8 @@
 # Copia este archivo a terraform.tfvars y rellena los valores reales.
 # terraform.tfvars NUNCA debe subirse a git (ya está en .gitignore).
 
-github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Ruta local al .zip con el código de la app (Terraform lo sube a S3).
+app_zip_path = "/ruta/absoluta/a/happy-art-eventos_desarrollo.zip"
 
 # Contenido COMPLETO del JSON de la cuenta de servicio de Firebase, en una
 # sola línea (puedes generarlo con: cat cuenta-servicio.json | tr -d '\n')
@@ -13,4 +14,3 @@ session_secret_key = "pega-aqui-el-valor-generado"
 # Opcional — valores por defecto ya definidos en variables.tf:
 # aws_region    = "us-east-1"
 # instance_type = "t3.micro"
-# repo_branch   = "master"
