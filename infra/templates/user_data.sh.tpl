@@ -13,7 +13,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y \
   python3 python3-venv python3-pip awscli unzip nginx \
-  libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
+  libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b \
   libgdk-pixbuf2.0-0 libffi-dev shared-mime-info fonts-liberation
 
 # ---------------------------------------------------------------------------
